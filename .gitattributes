@@ -1,0 +1,18 @@
+# Store text with LF line endings; each checkout uses its own OS's endings
+* text=auto
+
+# Scripts that need fixed line endings
+*.sh   text eol=lf
+*.tcl  text eol=lf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Binary files: never diff or merge as text
+*.xsa  binary
+*.bit  binary
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.wav  binary
+*.docx binary
+*.pptx binary

@@ -1,0 +1,67 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+.scratch/
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+
+# Datasets and recordings stay out of Git (see git-protocol.txt)
+data/*
+!data/.gitkeep
+*.wav
+*.flac
+*.mp3
+*.npy
+*.npz
+*.zip
+*.tar
+*.gz
+
+# Training checkpoints and tool logs; small final models (.onnx, .tflite)
+# may be committed in results/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+wandb/
+runs/
+mlruns/
+lightning_logs/
+
+# Vivado: rebuild the project from hardware/tcl into hardware/build/
+hardware/build/
+.Xil/
+*.xpr
+*.cache/
+*.runs/
+*.gen/
+*.hw/
+*.ip_user_files/
+*.sim/
+*.srcs/
+*.jou
+*.log
+*.str
+*.bit
+
+# Vitis: keep the workspace outside the repo or in firmware/build/
+firmware/build/
+.metadata/
+_ide/
+.analytics
+Debug/
+Release/
+*.elf
