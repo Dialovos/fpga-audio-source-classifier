@@ -1,31 +1,59 @@
 # Project Plan - CSC4240
 
-TThe report and code are due Wed Nov 25, so the last stage ends Wed Nov 18. That leaves a full week for final adjustments.
+The report and code are due Wed Nov 25, so the last stage ends Wed Nov 18. That leaves a full week for final adjustments.
 
-Stage 1 ends before the progress check-in window (Oct 25 - Nov 5) so we have results to show. Deadlines land on Sundays to line up with our meetings, except Stage 3, which ends on the buffer date.
+We start today, Fri Oct 9. Vadin starts Oct 12 and Adam starts Oct 14, so Stage 1 is the longest stage to give everyone time to get going.
+
+For the progress check-in (Oct 25 - Nov 5), we should book a late slot (~Nov 2-5) so we have Stage 1 and early Stage 2 results to show.
 
 | Stage | Dates | Deadline |
 | --- | --- | --- |
-| 1. Data, filter ID, recovery limit | Oct 6 - Oct 18 | Sun Oct 18 |
-| 2. Recovery pipeline & event detection | Oct 19 - Nov 8 | Sun Nov 8 |
+| 1. Test data, filter ID, recovery limit | Oct 9 - Oct 25 | Sun Oct 25 |
+| 2. Recovery pipeline & event detection | Oct 26 - Nov 8 | Sun Nov 8 |
 | 3. MicroBlaze benchmark, final results, report | Nov 9 - Nov 18 | Wed Nov 18 |
 | Buffer | Nov 19 - Nov 25 | Wed Nov 25 (turn-in) |
 
-## Stage 1 - Data, Filter ID, and the Recovery Limit (due Sun Oct 18)
+Team meeting: weekend of Oct 17-18 to start tying things together. The 17th is a Saturday, so we still need to pick the day.
+
+## Roles
+
+Based on our first meeting, adjusted for the revised proposal.
+
+| Person | Area | What they own now |
+| --- | --- | --- |
+| Adam | FPGA / hardware (SystemVerilog/VHDL, Vivado) | Test data method for the third revision, the MicroBlaze hardware platform & `.xsa`, and FPGA acceleration if we have time |
+| Le | ML & repo (Python) | Test signal generator code, AI layer 1 (filter ID), AI layer 2 (event classifier), exporting weights, and the repo & PRs |
+| Vadin | | |
+| John | Audio / DSP (C, Python first) | Cleaning the event sounds, the inverse filter, the recovery limit test, and checking the MicroBlaze output matches Python |
+| Tomu | | |
+
+- Vadin and Tomu pick from the tasks marked Open below.
+
+- Everyone writes up their own part for the report, since the course wants a section on what each person did.
+
+## Stage 1 - Test Data, Filter ID, and the Recovery Limit (due Sun Oct 25)
 
 Goal: show the first AI layer works, and find out how much filtered out sound we can get back.
 
-- Build the test signal generator. Mix speech with event sounds from public datasets, plus cabin noise.
+- Adam: write up the test data method for the third revision ASAP. Le builds the generator code from it, with a first version ready for the meeting.
 
-- Run every mix through a random high-pass, low-pass, or band-pass filter with a known type, order, and cutoff. We make the filters ourselves, so the labels come for free.
+- Le: Build the test signal generator. Mix speech with event sounds from public datasets, plus cabin noise.
 
-- AI layer 1: predict the filter type and order, estimate the cutoffs, from the filtered audio. Only try a small neural net if that falls short.
+- Le: Run every mix through a random high-pass, low-pass, or band-pass filter with a known type, order, and cutoff. We make the filters ourselves, so the labels come for free.
 
-- Recovery limit test: apply the inverse filter with a cap on how much it can boost, then measure how much of a buried event comes back as the cut gets deeper. Anything pushed below the noise floor is gone for good, so this test decides what we can claim.
+- Le: AI layer 1: predict the filter type and order, estimate the cutoffs, from the filtered audio. Only try a small neural net if that falls short.
 
-- Check: blind filter identification, forensic audio restoration, published acoustic analysis of cockpit voice recorders.
+- John: pick and clean the event sounds the generator uses.
 
-- Hardware in parallel: get a basic program running on the MicroBlaze and measure cycle counts, so Stage 3 doesn't start from zero.
+- John: Recovery limit test: apply the inverse filter with a cap on how much it can boost, then measure how much of a buried event comes back as the cut gets deeper. Anything pushed below the noise floor is gone for good, so this test decides what we can claim.
+
+- Le & John: Check: blind filter identification, forensic audio restoration, published acoustic analysis of cockpit voice recorders.
+
+- Open: Hardware in parallel: get a basic program running on the MicroBlaze and measure cycle counts, so Stage 3 doesn't start from zero.
+
+- Adam (from Oct 14): build the MicroBlaze hardware platform and export the `.xsa` for the MicroBlaze software.
+
+- Open: sketch the flow on the board (what runs in what order, and what goes out over UART) and start the PC side that reads it.
 
 Done when: we have the filter ID accuracy, a plot of the recovery limit, and the generator script in the repo.
 
@@ -33,27 +61,29 @@ Done when: we have the filter ID accuracy, a plot of the recovery limit, and the
 
 Goal: show that recovery helps event detection, start to finish.
 
-- Inverse filter using the estimated filter. Also run it with the true filter so we know the best case.
+- John: Inverse filter using the estimated filter. Also run it with the true filter so we know the best case.
 
-- AI layer 2: an event classifier built on a pretrained audio model with a small classifier on top.
+- Le: AI layer 2: an event classifier built on a pretrained audio model with a small classifier on top.
 
-- Main comparison: detect events on the filtered audio as-is, after recovery with the estimated filter, after recovery with the true filter, and on the original audio as the ceiling.
+- Le: Main comparison: detect events on the filtered audio as-is, after recovery with the estimated filter, after recovery with the true filter, and on the original audio as the ceiling.
 
-- Get the small models ready for the board: shrink them and port them to C.
+- Le & Open: Get the small models ready for the board: shrink them and port them to C.
 
-- Check-in: present the Stage 1 results and the early Stage 2 results.
+- Adam: FPGA acceleration for the inverse filter or the classifier, only if the basics are on track.
+
+- Everyone: Check-in (late slot, ~Nov 2-5): present the Stage 1 results and the early Stage 2 results.
 
 Done when: we have a table and figures for the main comparison.
 
 ## Stage 3 - MicroBlaze Benchmark, Final Results, and Report (due Wed Nov 18)
 
-- Run the whole pipeline on the MicroBlaze with recorded test signals: filter ID, the inverse filter, event classifier. Measure speed and memory, and check the outputs match the PC version.
+- Open: Run the whole pipeline on the MicroBlaze with recorded test signals: filter ID, the inverse filter, event classifier. Measure speed and memory, and check the outputs match the PC version.
 
-- Final runs: repeat the experiments on held-out sounds and filters, and finish the figures.
+- Le: Final runs: repeat the experiments on held-out sounds and filters, and finish the figures.
 
-- Write the 4-page report draft: method, ideas we tried and dropped, implementation, eval, and what each person did.
+- Everyone: Write the 4-page report draft: method, ideas we tried and dropped, implementation, eval, and what each person did.
 
-- Code: a README and notebooks that run from a clean setup, and market analysis is for the bonus.
+- Le: Code: a README and notebooks that run from a clean setup, and market analysis is for the bonus.
 
 Done when: we have a full report draft and code anyone can run.
 
@@ -61,7 +91,7 @@ Done when: we have a full report draft and code anyone can run.
 
 - Fixes, reruns, proofreading, and turn-in on Wed Nov 25.
 
-- Build the slides for the presentation the week of Dec 1.
+- Everyone: Build the slides for the presentation the week of Dec 1.
 
 ## Things to Keep in Mind
 
