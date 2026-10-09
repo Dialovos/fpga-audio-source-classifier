@@ -16,6 +16,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+personal-docs/
+
 # Datasets and recordings stay out of Git (see git-protocol.docx)
 data/*
 !data/.gitkeep
