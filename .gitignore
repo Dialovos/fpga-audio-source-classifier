@@ -13,7 +13,6 @@ __pycache__/
 .scratch/
 .vscode/
 .idea/
-.claude/
 .DS_Store
 Thumbs.db
 
@@ -29,8 +28,7 @@ data/*
 *.tar
 *.gz
 
-# Training checkpoints and tool logs; small final models (.onnx, .tflite)
-# may be committed in results/
+# Training checkpoints and tool logs; small models may be committed in results/
 *.pt
 *.pth
 *.ckpt
