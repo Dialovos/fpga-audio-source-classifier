@@ -1,6 +1,6 @@
 # Project Map
 
-These eight diagrams show how the whole project fits together, so everyone can see where their part sits, what it takes in, and what it hands to the next part. The source is `project-map.drawio`, with one tab per diagram. You can open and edit it at app.diagrams.net, or in VS Code with the Draw.io Integration extension. Most of the project isn't built yet, so most boxes show the plan from the approved proposal and the role sheet. Treat the planned boxes and the files between them as a starting point the team can change, not a final design. The filter ID model, which is built, has its own detailed map in `docs/code-map/`.
+These eight diagrams show how the whole project fits together, so everyone can see where their part sits, what it takes in, and what it hands to the next part. The source is `project-map.drawio`, with one tab per diagram. You can open and edit it at app.diagrams.net, or in VS Code with the Draw.io Integration extension. Most of the project isn't built yet, so most boxes show the plan from the approved proposal and the role sheet. Treat the planned boxes and the files between them as a starting point the team can change, not a final design. Running on the MicroBlaze was a stretch goal in the proposal, and this map assumes we do it. The filter ID model, which is built, has its own detailed map in `docs/code-map/`.
 
 The colors mean the same thing in every diagram. Blue is code that's built, green is the shared pipeline code, orange is a file or data that gets passed between parts, purple is the hardware and firmware, and a dashed box is a part that isn't built yet. An arrow means one part feeds the next, and a dashed arrow means it's used for training or set up ahead of time rather than run every time.
 
@@ -10,7 +10,7 @@ The colors mean the same thing in every diagram. Blue is code that's built, gree
 
 The project starts with 10 to 20 source recordings and the event labels that say what happens in them and when. The test data generator turns those into labeled test data, and the filter ID model trains on it. Everything inside the offline app box runs when someone analyzes a recording. The recording goes into the filter ID model, which predicts the filter. The compensation filter uses that prediction to undo the filter, and the event model looks for events in the result. What comes out is a report with the predicted filter and the detected events, plus the compensated audio.
 
-The evaluation sits underneath. It takes held-out test data from the generator and the event model's results, and measures whether undoing the filter really helps. Running a small model on the MicroBlaze is a stretch goal, so it's off to the side. The shared pipeline code along the bottom is used by every part.
+The evaluation takes the event model's results on held-out test data and measures whether undoing the filter really helps. The board lane below it is the live side. The capstone board's ADC and FPGA stream the audio to the MicroBlaze, which runs a small version of the filter ID model, and the PC reads its results over UART. The dashed arrow from the filter ID model is the export, which happens ahead of time on the PC. The shared pipeline code along the bottom is used by every part.
 
 ## 2. Shared pipeline
 
@@ -56,11 +56,13 @@ The evaluation answers the main question in the proposal: does undoing the filte
 
 The results get split by whether the noise went in before or after the filter. If undoing the filter doesn't improve detection, that's still a valid result, and we report it.
 
-## 8. MicroBlaze (stretch goal)
+## 8. MicroBlaze
 
 ![MicroBlaze](8-microblaze.png)
 
-Running on the board is a stretch goal, so only the purple hardware path that already exists is solid. The capstone board's ADC feeds the FPGA, which sends the audio as a TDM stream over gigabit Ethernet to a DAW, and that works today. If there's time, a small version of the trained model gets exported from the PC as INT8 weights and filter coefficients in C arrays. The MicroBlaze runs it on the TDM stream and sends results to the PC over UART. The `hardware/`, `firmware/`, and `host/` folders in the repo are where that work would go.
+This tab shows the on-board path in detail. The capstone board's 64-channel ADC feeds the FPGA, which turns the audio into a TDM stream. That stream already goes over gigabit Ethernet to a DAW, which works today, so it's drawn solid. The new part is the MicroBlaze. On the PC, the trained filter ID model gets exported for C as INT8 weights, along with the band layout the features use and any filter coefficients, and built into the firmware with Vitis. On the board, the MicroBlaze works out the same band levels from the TDM stream in C, using the DDR3 memory for audio buffers, and runs the small model on them. Its results go to the PC over UART, where a reader in `host/` picks them up. The current tree model is far too big for the board (its saved file is about 12 MB), so the board needs a smaller model, like a small neural net, trained to give the same answers.
+
+The last step is checking that the C version gives the same answers as Python on the same clips. The board does its math with 32-bit floats or 8-bit integers instead of Python's 64-bit floats, so small differences are expected, and this check shows whether they change any predictions. The `hardware/`, `firmware/`, and `host/` folders in the repo are where this work goes.
 
 ## Updating the diagrams
 
