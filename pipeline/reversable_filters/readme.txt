@@ -1,8 +1,8 @@
 CLI syntax:
 ./filter <filter type> <filter family> <filter order(1,2,4 are the only ones supported)> <inFile> <outFile> <menu option>  
 CLI test commands:
-./filter LP Butterworth 4 300 5000 voice_capture_both.wav voice_capture_br.wav 6
-./filter LP Butterworth 4 300 5000 voice_capture.wav voice_capture_both.wav 3
+./filter LP butter 4 300 5000 voice_capture_both.wav voice_capture_br.wav 6
+./filter LP butter 4 300 5000 voice_capture.wav voice_capture_both.wav 3
 
 
 Menu option 1 selects low pass, 2 selects high pass, 3 selects both (band pass)
