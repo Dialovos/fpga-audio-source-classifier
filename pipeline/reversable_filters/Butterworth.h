@@ -21,10 +21,13 @@ typedef struct {
 } WavHeader;
 #pragma pack(pop)
 
-void apply_bilinear_lowpass(const char* input_filename, const char* output_filename, double cutoff_freq_hz);
+void apply_bilinear_lowpass(const char* input_filename, const char* output_filename, double cutoff_freq_hz, int order);
 
-void apply_bilinear_highpass(const char* input_filename, const char* output_filename, double cutoff_freq_hz);
+void apply_bilinear_highpass(const char* input_filename, const char* output_filename, double cutoff_freq_hz, int order);
 
-void reverse_bilinear_lowpass(const char* input_filename, const char* output_filename, double cutoff_freq_hz);
+void reverse_bilinear_lowpass(const char* input_filename, const char* output_filename, double cutoff_freq_hz, int order);
+
+void reverse_bilinear_bandpass(const char *input_filename, const char *output_filename,
+double hp_cutoff_freq_hz, double lp_cutoff_freq_hz, int order);
 
 #endif
