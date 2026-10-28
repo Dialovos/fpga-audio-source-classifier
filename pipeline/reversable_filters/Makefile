@@ -2,7 +2,7 @@ CC = gcc
 
 CFLAGS = -Wall -Wextra -O2 -std=c11
 
-TARGET = Butterworth_Process
+TARGET = filter
 
 OBJS = main.o Butterworth.o 
 
