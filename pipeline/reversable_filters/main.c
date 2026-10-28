@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
       }
 
       // menu for automated runs
-    } else if (mode == 1) {
+    } else if (mode == 1 && strcmp(AI_family, "butter") == 0) {
       if (choice == 1) {
         apply_bilinear_lowpass(AI_inFile, AI_outFile, AI_fc_lp, AI_order);
         printf("applied lowpass\r\n");
@@ -123,6 +123,9 @@ int main(int argc, char *argv[]) {
       }
       printf("Automated task finished\r\n");
       return 1;
+    } else if (mode == 1 && strcmp(AI_family, "butter") != 0){
+      printf("invalid filter family\r\n");
+      return -1;
     }
   }
   return 0;
