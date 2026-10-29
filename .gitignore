@@ -40,6 +40,8 @@ wandb/
 runs/
 mlruns/
 lightning_logs/
+# Trained filter ID models stay out of Git
+*.joblib
 
 # Vivado: rebuild the project from hardware/tcl into hardware/build/
 hardware/build/

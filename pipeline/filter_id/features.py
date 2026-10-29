@@ -20,13 +20,9 @@ from scipy import signal
 SMALLEST_POWER = 1e-30
 
 
-# ****************************************************************************
+# ********************************
 # The band layout
-#
-# The bands are spaced evenly on a log scale, so each one covers the same
-# fraction of an octave. That matches how we hear, and how filter slopes are
-# measured (dB per octave).
-# ****************************************************************************
+# ********************************
 
 
 # Returns the edges of n_bands log-spaced bands from f_min_hz to f_max_hz. There's
@@ -43,13 +39,9 @@ def band_centers(edges: np.ndarray) -> np.ndarray:
     return np.sqrt(lower_edges * upper_edges)
 
 
-# ****************************************************************************
+# ********************************
 # Measuring the spectrum
-#
-# spectrum_features checks its inputs, measures the average power at each
-# frequency (Welch's method), averages that into the bands, then converts to dB
-# relative to the median band.
-# ****************************************************************************
+# ********************************
 
 
 # Stops if the audio isn't mono, or if the band range doesn't fit below Nyquist.
@@ -88,7 +80,6 @@ def _power_per_band(freqs: np.ndarray, power: np.ndarray, edges: np.ndarray) -> 
         bins_in_band = end - first
 
         if bins_in_band > 0:
-            # Average the bins inside the band.
             band_sum = running_total[end] - running_total[first]
             band_power[band] = band_sum / bins_in_band
         else:
@@ -120,11 +111,9 @@ def spectrum_features(
     segment_length = min(segment, len(samples))
     freqs, power = signal.welch(samples, fs=sample_rate, nperseg=segment_length)
 
-    # Average the spectrum into the bands.
     edges = band_edges(n_bands, f_min_hz, f_max_hz)
     band_power = _power_per_band(freqs, power, edges)
 
-    # Convert to dB. The floor keeps log10 from failing on a power of exactly 0.
     db = 10 * np.log10(np.maximum(band_power, SMALLEST_POWER))
 
     # Subtract the median band, so only the shape is left, not the loudness.

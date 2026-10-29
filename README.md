@@ -27,6 +27,16 @@ Run this from the repo root:
 python -m pytest -q
 ```
 
+## Filter ID model (first AI layer)
+
+Predict the filter on mono WAV files at the model's sample rate (192 kHz):
+
+```
+python -m pipeline.filter_id predict --model model.joblib clip.wav
+```
+
+Each prediction prints as one JSON line with a `spec` (type, family, order, cutoff) and how confident the model is in the type and the order. A band-pass order is the total for both sides, so the C compensation filter in `pipeline/reversable_filters/`, which counts each side, gets half. Training isn't in the repo yet. It comes once the model's been tested on the team's recordings.
+
 ## Status
 
-Early setup. The Python pipeline lives in `pipeline/`, with its tests in `pipeline/tests/`.
+The filter ID model is in `pipeline/filter_id/`, with its tests in `pipeline/tests/`. The compensation filter's C code is in `pipeline/reversable_filters/`.
