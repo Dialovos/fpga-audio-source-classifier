@@ -7,6 +7,7 @@ CSC 4240 team project. An AI model identifies an unknown filter on an audio chan
 - What we tried and what happened: `docs/experiment-log.md`
 - How the whole project fits together: `docs/project-map/README.md` (diagrams, with the draw.io source next to them)
 - How the filter ID code fits together: `docs/code-map/README.md`
+- How the event model could work: `docs/event-model-map/README.md` (a suggested plan, since it isn't built yet)
 
 ## Setup
 
