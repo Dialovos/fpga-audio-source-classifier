@@ -1,0 +1,158 @@
+{
+  "eval_seed": 4241,
+  "examples_per_file": 200,
+  "groups": {
+    "raw": {
+      "examples": 600,
+      "type_accuracy": 0.7,
+      "type_and_order_accuracy": 0.44666666666666666,
+      "order_accuracy_given_true_type": 0.625,
+      "order_accuracy_given_true_type_by_type": {
+        "bandpass": 0.7315789473684211,
+        "highpass": 0.6619047619047619,
+        "lowpass": 0.485
+      },
+      "cutoff_error_octaves": {
+        "bandpass_low": {
+          "median": 0.6151619830227872,
+          "p90": 1.4131381872834574
+        },
+        "bandpass_high": {
+          "median": 0.6231869809207011,
+          "p90": 1.406139143363104
+        },
+        "highpass": {
+          "median": 0.5843304982034199,
+          "p90": 1.6576603426758063
+        },
+        "lowpass": {
+          "median": 0.6254831232867717,
+          "p90": 1.4785663200834744
+        }
+      },
+      "by_noise_stage": {
+        "after_filter": {
+          "examples": 319,
+          "type_accuracy": 0.6394984326018809,
+          "type_and_order_accuracy": 0.335423197492163
+        },
+        "before_filter": {
+          "examples": 281,
+          "type_accuracy": 0.7686832740213523,
+          "type_and_order_accuracy": 0.5729537366548043
+        }
+      },
+      "type_confusion": {
+        "bandpass": {
+          "bandpass": 161,
+          "highpass": 19,
+          "lowpass": 10
+        },
+        "lowpass": {
+          "lowpass": 168,
+          "bandpass": 24,
+          "highpass": 8
+        },
+        "highpass": {
+          "lowpass": 11,
+          "highpass": 91,
+          "bandpass": 108
+        }
+      },
+      "type_accuracy_by_file": {
+        "VO1": 0.68,
+        "VO2": 0.69,
+        "VO3": 0.73
+      }
+    },
+    "noisy": {
+      "examples": 600,
+      "type_accuracy": 0.6433333333333333,
+      "type_and_order_accuracy": 0.38166666666666665,
+      "order_accuracy_given_true_type": 0.6166666666666667,
+      "order_accuracy_given_true_type_by_type": {
+        "bandpass": 0.7578947368421053,
+        "highpass": 0.6952380952380952,
+        "lowpass": 0.4
+      },
+      "cutoff_error_octaves": {
+        "bandpass_low": {
+          "median": 0.7048346890911267,
+          "p90": 1.6190893830223028
+        },
+        "bandpass_high": {
+          "median": 0.5215943103662972,
+          "p90": 1.3817409430132985
+        },
+        "highpass": {
+          "median": 0.6482808973731495,
+          "p90": 2.0898004928313223
+        },
+        "lowpass": {
+          "median": 0.6401235689638956,
+          "p90": 1.4070044079963373
+        }
+      },
+      "by_noise_stage": {
+        "after_filter": {
+          "examples": 319,
+          "type_accuracy": 0.5579937304075235,
+          "type_and_order_accuracy": 0.27899686520376177
+        },
+        "before_filter": {
+          "examples": 281,
+          "type_accuracy": 0.7402135231316725,
+          "type_and_order_accuracy": 0.498220640569395
+        }
+      },
+      "type_confusion": {
+        "bandpass": {
+          "bandpass": 54,
+          "highpass": 94,
+          "lowpass": 42
+        },
+        "lowpass": {
+          "lowpass": 185,
+          "highpass": 15
+        },
+        "highpass": {
+          "lowpass": 63,
+          "highpass": 147
+        }
+      },
+      "type_accuracy_by_file": {
+        "VO1_noise": 0.65,
+        "VO2_noise": 0.715,
+        "VO3_noise": 0.565
+      }
+    }
+  },
+  "unfiltered": {
+    "VO1": {
+      "lowpass": 88,
+      "bandpass": 12
+    },
+    "VO1_noise": {
+      "lowpass": 100
+    },
+    "VO2": {
+      "lowpass": 75,
+      "bandpass": 21,
+      "highpass": 4
+    },
+    "VO2_noise": {
+      "lowpass": 96,
+      "highpass": 4
+    },
+    "VO3": {
+      "lowpass": 93,
+      "bandpass": 6,
+      "highpass": 1
+    },
+    "VO3_noise": {
+      "lowpass": 99,
+      "highpass": 1
+    }
+  },
+  "seconds": 69.9
+}

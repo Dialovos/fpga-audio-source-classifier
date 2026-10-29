@@ -1,0 +1,76 @@
+{
+  "seed": 4241,
+  "sample_rate": 192000,
+  "clip_seconds": 1.0,
+  "bits": 24,
+  "examples_per_file": 200,
+  "unfiltered_pieces_per_file": 100,
+  "files": {
+    "raw": [
+      "VO1.wav",
+      "VO2.wav",
+      "VO3.wav"
+    ],
+    "noisy": [
+      "VO1_noise.wav",
+      "VO2_noise.wav",
+      "VO3_noise.wav"
+    ]
+  },
+  "filters": {
+    "types": [
+      "highpass",
+      "lowpass",
+      "bandpass"
+    ],
+    "orders": {
+      "highpass": [
+        1,
+        2,
+        4
+      ],
+      "lowpass": [
+        1,
+        2,
+        4
+      ],
+      "bandpass": [
+        2,
+        4,
+        8
+      ]
+    },
+    "highpass_cutoff_hz": [
+      80,
+      1000
+    ],
+    "lowpass_cutoff_hz": [
+      2000,
+      16000
+    ],
+    "bandpass_low_hz": [
+      80,
+      1000
+    ],
+    "bandpass_high_hz": [
+      2000,
+      16000
+    ]
+  },
+  "noise": {
+    "snr_db": [
+      20,
+      40
+    ],
+    "stages": [
+      "before_filter",
+      "after_filter"
+    ]
+  },
+  "features": {
+    "n_bands": 96,
+    "f_min_hz": 20,
+    "f_max_hz": 24000,
+    "segment": 32768
+  }
+}
