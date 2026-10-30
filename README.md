@@ -28,7 +28,7 @@ Run this from the repo root:
 python -m pytest -q
 ```
 
-The C filter in `pipeline/reversable_filters/` has its own checks, which build it and compare its output with Python. They need Linux with gcc, make, and FFTW (on Ubuntu: `sudo apt install build-essential libfftw3-dev`), so the run above leaves them out. Run them on their own:
+The C filter in `pipeline/reversable_filters/` has its own checks, which build it, compare its output with Python, and try it on bad calls. They need Linux with gcc, make, and FFTW (on Ubuntu: `sudo apt install build-essential libfftw3-dev`), so the run above leaves them out. Run them on their own:
 
 ```
 python -m pytest pipeline/tests/check_c_filter.py
