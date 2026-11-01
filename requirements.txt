@@ -4,3 +4,4 @@ soundfile>=0.12
 matplotlib>=3.8
 scikit-learn>=1.5
 pytest>=8.0
+ipykernel>=6.0
