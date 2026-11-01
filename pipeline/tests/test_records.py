@@ -1,4 +1,6 @@
-"""Checks for settings files, seeds, and example records."""
+"""
+Checks for settings files, seeds, and example records.
+"""
 
 import json
 
@@ -8,6 +10,8 @@ import pytest
 from pipeline.records import SCHEMA_VERSION, build_record, example_seed, load_settings, read_record, write_record
 
 
+# Builds a valid example record from made-up fields. Pass a field by name to
+# change it, so each test only has to spell out the part it's checking.
 def sample_record(**overrides):
     fields = {
         "example_id": "ex-000001",
@@ -143,3 +147,45 @@ def test_damage_steps_say_where_they_happened():
     for damage in bad_lists:
         with pytest.raises(ValueError):
             sample_record(damage=damage)
+
+
+# Tests: clip and event fields keep extra recipe values and old records keep
+# their keys.
+# Why: event clips need their timings without changing unrelated records.
+def test_clip_and_events_are_optional_and_preserved():
+    clip = {"start_s": 2, "duration_s": 3, "gain": 0.5, "split": "train"}
+    events = [{"type": "hiss", "start_s": 0.3, "end_s": 2, "recipe": {"cutoff_hz": 5000}}]
+    record = sample_record(clip=clip, events=events)
+
+    assert record["clip"] == clip
+    assert record["events"] == events
+    assert record["schema_version"] == 2
+    assert set(sample_record()) == {"schema_version", "example_id", "seed", "sample_rate", "sources", "filter", "damage"}
+
+
+# Tests: missing types, bad times, bad clips and events without a clip stop.
+# Why: saved labels must fit inside a real clip.
+def test_bad_clip_or_events_stop():
+    clip = {"start_s": 0, "duration_s": 3, "gain": 1}
+    bad_events = [
+        [{"start_s": 0, "end_s": 1}],
+        [{"type": "", "start_s": 0, "end_s": 1}],
+        [{"type": "hiss", "start_s": 1, "end_s": 1}],
+        [{"type": "hiss", "start_s": -1, "end_s": 1}],
+        [{"type": "hiss", "start_s": 1, "end_s": 4}],
+        [{"type": "hiss", "start_s": np.nan, "end_s": 2}],
+    ]
+
+    for events in bad_events:
+        with pytest.raises(ValueError):
+            sample_record(clip=clip, events=events)
+
+    with pytest.raises(ValueError, match="clip"):
+        sample_record(events=[])
+
+    for key, value in (("start_s", -1), ("duration_s", 0), ("gain", 0), ("gain", np.inf)):
+        bad_clip = dict(clip)
+        bad_clip[key] = value
+
+        with pytest.raises(ValueError, match=key):
+            sample_record(clip=bad_clip)

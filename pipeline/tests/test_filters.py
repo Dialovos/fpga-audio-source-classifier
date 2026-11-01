@@ -1,4 +1,5 @@
-"""Checks that the filters we apply are the filters we asked for.
+"""
+Checks that the filters we apply are the filters we asked for.
 
 Everything runs at 192 kHz, the proposal's sample rate. The proposal uses Butterworth
 high-pass, low-pass, and band-pass filters at orders 1, 2, and 4, so those are the main cases.
@@ -8,45 +9,48 @@ import json
 
 import numpy as np
 import pytest
+from scipy import signal
 
 from pipeline.filters import apply_filter, design_filter, normalize_spec, response_db
 
 FS = 192_000
 
 
+# Returns a sine wave at freq_hz with a peak of 1, seconds long, at 192 kHz.
 def tone(freq_hz: float, seconds: float = 3.0) -> np.ndarray:
     t = np.arange(int(seconds * FS)) / FS
     return np.sin(2 * np.pi * freq_hz * t)
 
 
+# Returns the gain of the filter we actually applied, measured on a steady tone.
+# It uses the last second only, since that's past the start-up transient and
+# integer-Hz tones fit a whole number of cycles in it, so the RMS ratio is exact.
 def applied_gain_db(spec: dict, freq_hz: float) -> float:
-    """Gain of the filter we actually applied, measured on a steady tone.
-
-    Uses the last second only: it's past the start-up transient, and integer-Hz
-    tones fit a whole number of cycles in it, so the RMS ratio is exact.
-    """
     x = tone(freq_hz)
     y, _ = apply_filter(x, FS, spec)
     tail = slice(-FS, None)
     return 20 * np.log10(np.sqrt(np.mean(y[tail] ** 2)) / np.sqrt(np.mean(x[tail] ** 2)))
 
 
+# Returns the analog frequency that the digital (bilinear) filter maps to freq_hz.
 def prewarp(freq_hz: float) -> float:
-    """Analog frequency that the digital (bilinear) filter maps to freq_hz."""
     return FS / np.pi * np.tan(np.pi * freq_hz / FS)
 
 
-def butterworth_db(freq_hz, kind, prototype_order, cutoff):
-    """Textbook analog Butterworth magnitude in dB, evaluated with prewarping."""
+# Returns the textbook analog Butterworth gain in dB, with prewarping. A
+# band-pass is a high-pass at the low edge followed by a low-pass at the high
+# edge, so its dB is the two added together, and order is the order of each side.
+def butterworth_db(freq_hz, kind, order, cutoff):
+    if kind == "bandpass":
+        highpass = butterworth_db(freq_hz, "highpass", order, cutoff[0])
+        lowpass = butterworth_db(freq_hz, "lowpass", order, cutoff[1])
+        return highpass + lowpass
     f = prewarp(freq_hz)
     if kind == "lowpass":
         x = f / prewarp(cutoff)
-    elif kind == "highpass":
-        x = prewarp(cutoff) / f
     else:
-        low, high = prewarp(cutoff[0]), prewarp(cutoff[1])
-        x = (f**2 - low * high) / (f * (high - low))
-    return -10 * np.log10(1 + x ** (2 * prototype_order))
+        x = prewarp(cutoff) / f
+    return -10 * np.log10(1 + x ** (2 * order))
 
 
 # Tests: a Butterworth high-pass at 250 Hz cuts a 100 Hz tone by the textbook amount at orders 1, 2, and 4
@@ -84,10 +88,10 @@ def test_highpass_passes_speech_band():
 # Tests: a 250 Hz - 6 kHz Butterworth band-pass matches the textbook gain at 100 Hz (rumble), 1 kHz (speech),
 #   and 10 kHz (hiss), at total orders 2, 4, and 8.
 # Why: 250 Hz - 6 kHz is the band in the proposal's figure, and those three tones are the sounds it buries or
-#   keeps. The proposal doesn't say how band-pass order is counted, so this covers both readings. If we count
-#   total poles, its 2nd and 4th order are total orders 2 and 4 (1st order isn't possible). If we count each
-#   side like a DAW, its 1st, 2nd, and 4th order are total orders 2, 4, and 8. It also checks our order rule,
-#   since handing SciPy the wrong number breaks the match.
+#   keeps. We build a band-pass the same way as the C filters, a high-pass at 250 Hz followed by a low-pass at
+#   6 kHz, so the textbook gain is the two added together. Total orders 2, 4, and 8 are 1st, 2nd, and 4th order
+#   on each side, which covers the proposal's orders however band-pass order ends up being counted. It also
+#   checks our order rule, since giving each side the wrong number of poles breaks the match.
 @pytest.mark.parametrize("total_order", [2, 4, 8])
 @pytest.mark.parametrize("freq_hz", [100, 1000, 10_000])
 def test_bandpass_matches_textbook(total_order, freq_hz):
@@ -151,30 +155,33 @@ def test_bandpass_edges_land_where_we_asked(total_order):
     assert edges == pytest.approx([-3.01, -3.01], abs=0.05)
 
 
-# Tests: the number of second-order sections follows our order rule. Each section holds up to 2 poles,
-#   so high-pass and low-pass orders 1 and 2 give 1 section and order 4 gives 2. Band-pass orders 2, 4,
-#   and 8 give 1, 2, and 4 sections.
-# Why: the AI has to predict the order, so the order in a label has to mean one thing. SciPy's band-pass with
-#   order N really ends up with order 2N, and our labels count total poles, so a band-pass labeled 4 has to be
-#   4 poles (2 sections), not 8. Keeping this rule in one place is the main reason we have our own filter function.
+# Tests: the designed filter has exactly as many poles as its order says: 1, 2, and 4 for high-pass and
+#   low-pass, and 2, 4, and 8 for band-pass, where each side gets half.
+# Why: the AI has to predict the order, so the order in a label has to mean one thing. Our labels count total
+#   poles, so a band-pass labeled 4 has to be 4 poles (2 in the high-pass and 2 in the low-pass), not 8.
+#   It counts poles instead of sections, since a 1st-order side still fills a whole section, with an extra
+#   pole at exactly 0 that does nothing. Keeping this rule in one place is the main reason we have our own
+#   filter function.
 @pytest.mark.parametrize(
-    "kind, order, sections",
+    "kind, order",
     [
-        ("lowpass", 1, 1),
-        ("lowpass", 2, 1),
-        ("lowpass", 4, 2),
-        ("highpass", 1, 1),
-        ("highpass", 2, 1),
-        ("highpass", 4, 2),
-        ("bandpass", 2, 1),
-        ("bandpass", 4, 2),
-        ("bandpass", 8, 4),
+        ("lowpass", 1),
+        ("lowpass", 2),
+        ("lowpass", 4),
+        ("highpass", 1),
+        ("highpass", 2),
+        ("highpass", 4),
+        ("bandpass", 2),
+        ("bandpass", 4),
+        ("bandpass", 8),
     ],
 )
-def test_order_counts_total_poles(kind, order, sections):
+def test_order_counts_total_poles(kind, order):
     cutoff = [250, 6000] if kind == "bandpass" else 1000
     sos = design_filter({"type": kind, "family": "butter", "order": order, "cutoff": cutoff}, FS)
-    assert sos.shape == (sections, 6)
+    _, poles, _ = signal.sos2zpk(sos)
+    real_poles = poles[np.abs(poles) > 1e-12]
+    assert len(real_poles) == order
 
 
 # Tests: the record from apply_filter survives a trip through JSON, has every setting we used (defaults

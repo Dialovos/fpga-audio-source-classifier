@@ -7,7 +7,7 @@ CSC 4240 team project. An AI model identifies an unknown filter on an audio chan
 - What we tried and what happened: `docs/experiment-log.md`
 - How the whole project fits together: `docs/project-map/README.md` (diagrams, with the draw.io source next to them)
 - How the filter ID code fits together: `docs/code-map/README.md`
-- How the event model could work: `docs/event-model-map/README.md` (a suggested plan, since it isn't built yet)
+- How we planned the event model: `docs/event-model-map/README.md` (the code in `pipeline/event_model/` may differ in the details)
 
 ## Setup
 
@@ -44,6 +44,34 @@ python -m pipeline.filter_id predict --model model.joblib clip.wav
 
 Each prediction prints as one JSON line with a `spec` (type, family, order, cutoff) and how confident the model is in the type and the order. A band-pass order is the total for both sides, so the C compensation filter in `pipeline/reversable_filters/`, which counts each side, gets half. Training isn't in the repo yet. It comes once the model's been tested on the team's recordings.
 
+## Event model (second AI layer)
+
+The event model finds rumble, hiss, and transients (clicks and knocks) in the audio, and gives each one a start, an end, and a confidence. The easiest way in is the notebook, `pipeline/notebooks/le-event-model.ipynb`. It trains the model on the team's voiceovers, plots a test clip, and runs the comparison. Open it in VS Code or Jupyter with the `.venv` kernel, and put the voiceovers in `data/test-data-prelim/` first.
+
+To train it from the command line (takes ~6 minutes):
+
+```
+python -m pipeline.event_model train --out results/<YYYY-MM-DD>-<your-name>-<short-name>
+```
+
+With `source_dir` left empty in `pipeline/event_model/settings.json`, it writes synthetic speech-like backgrounds into the run folder. To use real recordings, set it to a folder of mono 192 kHz WAV files.
+
+To find the events in mono 192 kHz WAV files:
+
+```
+python -m pipeline.event_model detect --model results/<run>/model.joblib clip.wav
+```
+
+Each file prints as one JSON line with its events.
+
+To compare detection on four versions of the same held-out test clips (clean, filtered, filter undone with the known settings, and filter undone with the filter ID model's guess):
+
+```
+python -m pipeline.event_model compare --model results/<run>/model.joblib --filter-id-model <filter-id-model.joblib> --out results/<run>/compare
+```
+
+It writes the scores to `metrics.json`, one line per test case to `cases.jsonl`, and a few example WAVs to `examples/`. Leave out `--filter-id-model` to skip the AI guess version. The filter gets undone with our Python copy of the C inverse. On Linux, where the C program builds, add `--method c --c-command pipeline/reversable_filters/filter`.
+
 ## Status
 
-The filter ID model is in `pipeline/filter_id/`, with its tests in `pipeline/tests/`. The compensation filter's C code is in `pipeline/reversable_filters/`.
+The filter ID model is in `pipeline/filter_id/` and the event model is in `pipeline/event_model/`, with their tests in `pipeline/tests/`. The functions they share (filters, test sounds, noise and rounding, records, and the Python copy of the C inverse in `compensation.py`) are in `pipeline/`. The compensation filter's C code is in `pipeline/reversable_filters/`.
