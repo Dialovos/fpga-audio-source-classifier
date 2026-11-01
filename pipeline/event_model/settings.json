@@ -5,10 +5,12 @@
   "edge_margin_s": 0.25,
   "bits": 24,
   "sources": {
-    "source_dir": null,
-    "recording_groups": {},
-    "n_synthetic_recordings": 4,
-    "synthetic_recording_seconds": 120
+    "source_dir": "data/test-data-prelim",
+    "recording_groups": {
+      "VO1": {"background": "VO1.wav", "copies": ["VO1_noise.wav"]},
+      "VO2": {"background": "VO2.wav", "copies": ["VO2_noise.wav"]},
+      "VO3": {"background": "VO3.wav", "copies": ["VO3_noise.wav"]}
+    }
   },
   "split": {
     "test_recordings": 1,

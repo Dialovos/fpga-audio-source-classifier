@@ -60,7 +60,7 @@ To train it from the command line (takes ~6 minutes):
 python -m pipeline.event_model train --out results/<YYYY-MM-DD>-<your-name>-<short-name>
 ```
 
-With `source_dir` left empty in `pipeline/event_model/settings.json`, it writes synthetic speech-like backgrounds into the run folder. To use real recordings, set it to a folder of mono 192 kHz WAV files.
+It trains on the recordings in `sources.source_dir` of `pipeline/event_model/settings.json`, which is the team's voiceovers in `data/test-data-prelim/` by default, with each noisy copy grouped under its raw file. To use other recordings, point it at a folder of mono 192 kHz WAV files and list any noisy copies in `recording_groups`.
 
 To find the events in mono 192 kHz WAV files:
 

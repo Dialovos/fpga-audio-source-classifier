@@ -45,8 +45,6 @@ from pipeline.event_model.sources import (
     recordings,
     render_background,
     save_split,
-    synthetic_background,
-    write_synthetic_backgrounds,
 )
 from pipeline.filter_id.dataset import build_dataset
 from pipeline.filter_id.model import FilterIdModel
@@ -65,6 +63,27 @@ def default_settings():
     return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
 
 
+# Returns the folder after writing count simple background recordings: noise
+# kept to 150 Hz - 3 kHz like speech, in 1 s phrases with quiet pauses between
+# them, at RMS 0.1. They stand in for real recordings, which the tests can't
+# ship.
+def write_test_backgrounds(folder, count, seconds):
+    folder.mkdir(parents=True, exist_ok=True)
+    speech_band = {"type": "bandpass", "family": "butter", "order": 4, "cutoff": [150, 3000]}
+    n_samples = round(seconds * FS)
+    time = np.arange(n_samples) / FS
+
+    for index in range(count):
+        rng = np.random.default_rng([7, index])
+        noise, _ = apply_filter(rng.standard_normal(n_samples), FS, speech_band)
+        envelope = np.maximum(0.05, np.sin(2 * np.pi * 0.5 * time + index))
+        audio = noise * envelope
+        audio *= 0.1 / np.sqrt(np.mean(audio**2))
+        sf.write(folder / f"background-{index}.wav", audio, FS, subtype="FLOAT")
+
+    return folder.as_posix()
+
+
 # Returns the fixed development run, training its model only once in the test
 # session.
 @pytest.fixture(scope="session")
@@ -72,8 +91,6 @@ def development(tmp_path_factory):
     folder = tmp_path_factory.mktemp("development")
     settings = default_settings()
     settings["seed"] = 7
-    settings["sources"]["n_synthetic_recordings"] = 3
-    settings["sources"]["synthetic_recording_seconds"] = 40
     settings["clip_seconds"] = 3.0
     settings["events"]["per_clip"] = [1, 2]
 
@@ -85,7 +102,8 @@ def development(tmp_path_factory):
     settings["clips"]["tune_clips"] = 15
     settings["model"]["max_iter"] = 60
     check_settings(settings)
-    settings["sources"]["source_dir"] = write_synthetic_backgrounds(folder / "backgrounds", settings)
+    settings["sources"]["source_dir"] = write_test_backgrounds(folder / "backgrounds", 3, 40)
+    settings["sources"]["recording_groups"] = {}
     items = recordings(settings)
     split = make_split(items, settings)
     clips = {}
@@ -115,7 +133,8 @@ def development(tmp_path_factory):
     }
 
 
-# Returns every required setting path, including nested groups.
+# Returns every required setting path, including nested groups. The entries
+# inside recording_groups aren't required, since each run names its own.
 def setting_paths(settings, prefix=()):
     paths = []
 
@@ -123,7 +142,7 @@ def setting_paths(settings, prefix=()):
         path = prefix + (key,)
         paths.append(path)
 
-        if isinstance(value, dict):
+        if isinstance(value, dict) and key != "recording_groups":
             paths.extend(setting_paths(value, path))
 
     return paths
@@ -225,42 +244,6 @@ def test_event_sounds_repeat_and_keep_ranges():
     assert kinds == {"click", "knock"}
 
 
-# Tests: re-rendered backgrounds are the same FLOAT samples, have RMS 0.1 and no
-# silent 10-ms stretch.
-# Why: every clip must be rebuilt from the same saved recording without silent
-# pauses.
-def test_backgrounds_repeat_and_keep_level(development):
-    settings = development["settings"]
-    expected = synthetic_background(0, settings).astype(np.float32)
-    path = Path(settings["sources"]["source_dir"]) / "synthetic-bg-0000.wav"
-    actual, rate = sf.read(path, dtype="float32")
-    np.testing.assert_array_equal(actual, expected)
-
-    assert rate == FS
-    assert sf.info(path).subtype == "FLOAT"
-    assert np.sqrt(np.mean(actual.astype(np.float64)**2)) == pytest.approx(0.1, abs=1e-9)
-
-    powers = np.mean(actual.reshape(-1, 1920)**2, axis=1)
-
-    assert np.all(powers > 0)
-
-
-# Tests: the background folder comes back the way it was given, with forward
-# slashes, and the WAV is written inside it.
-# Why: a run's settings.json saves this folder and goes in Git, so it can't name
-# this computer's full path, and it has to work on the Linux machine too.
-def test_background_folder_stays_relative(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    settings = default_settings()
-    settings["sources"]["n_synthetic_recordings"] = 1
-    settings["sources"]["synthetic_recording_seconds"] = 1.0
-
-    folder = write_synthetic_backgrounds(Path("run") / "backgrounds", settings)
-
-    assert folder == "run/backgrounds"
-    assert (tmp_path / "run" / "backgrounds" / "synthetic-bg-0000.wav").exists()
-
-
 # Tests: whole recordings are held out and train and tune stretches keep their
 # exact guard gap.
 # Why: clips from the same moment must never appear on both sides of the split.
@@ -329,6 +312,7 @@ def test_recording_groups_use_only_the_raw_file(tmp_path):
 def test_recordings_reject_bad_wavs(tmp_path):
     settings = default_settings()
     settings["clip_seconds"] = 0.1
+    settings["sources"]["recording_groups"] = {}
 
     cases = [
         ("stereo", np.ones((FS // 10, 2)), FS),
@@ -918,12 +902,28 @@ def test_detect_command_json_and_bad_wavs(development, tmp_path, capsys):
             main(["detect", "--model", str(development["model_path"]), str(path)])
 
 
-# Returns a small trained filter ID model and its feature settings.
-def small_filter_id():
-    path = Path(__file__).parents[1] / "filter_id" / "settings.json"
-    settings = json.loads(path.read_text(encoding="utf-8"))
-    settings["n_sources"] = 3
-    settings["examples_per_source"] = 12
+# Returns a small filter ID model trained on the WAV files in source_dir, and
+# its settings.
+def small_filter_id(source_dir):
+    settings = {
+        "seed": 4240,
+        "sample_rate": FS,
+        "source_dir": source_dir,
+        "clip_seconds": 1.0,
+        "examples_per_source": 12,
+        "test_fraction": 0.2,
+        "bits": 24,
+        "filters": {
+            "types": ["highpass", "lowpass", "bandpass"],
+            "orders": {"highpass": [1, 2, 4], "lowpass": [1, 2, 4], "bandpass": [2, 4, 8]},
+            "highpass_cutoff_hz": [80, 1000],
+            "lowpass_cutoff_hz": [2000, 16000],
+            "bandpass_low_hz": [80, 1000],
+            "bandpass_high_hz": [2000, 16000],
+        },
+        "noise": {"snr_db": [20, 40], "stages": ["before_filter", "after_filter"]},
+        "features": {"n_bands": 96, "f_min_hz": 20, "f_max_hz": 24000, "segment": 32768},
+    }
     data = build_dataset(settings)
     model = FilterIdModel(7).fit(data.features, data.labels)
 
@@ -956,7 +956,7 @@ def test_comparison_versions_and_both_inverse_methods(development, tmp_path):
         "sys.exit(1)\n",
         encoding="utf-8",
     )
-    fid = small_filter_id()
+    fid = small_filter_id(settings["sources"]["source_dir"])
 
     for method in ("python", "c"):
         for use_fid in (False, True):

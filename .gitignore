@@ -18,6 +18,9 @@ Thumbs.db
 
 personal-docs/
 
+# Synthetic data generation and our own experiments stay on this machine
+local/
+
 # Datasets and recordings stay out of Git (see git-protocol.docx)
 data/*
 !data/.gitkeep

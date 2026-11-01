@@ -1,8 +1,7 @@
 """
-Write speech-like backgrounds, read recordings, and keep the three splits apart.
+Read recordings and keep the three splits apart.
 
-This file has three groups:
-    * Synthetic backgrounds
+This file has two groups:
     * Reading recordings
     * Saving and checking the split
 """
@@ -15,143 +14,6 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from pipeline.filter_id.dataset import shape_gain_db, synthetic_source
-
-# ********************************
-# Synthetic backgrounds
-# ********************************
-
-
-# Returns a speech envelope with phrases, pauses, and soft syllable bursts. Its
-# lowest value is 0.01, so a pause never becomes digital silence.
-def _envelope(count, sample_rate, rng) -> np.ndarray:
-    envelope = np.full(count, 0.01)
-    start = 0.0
-
-    while round(start * sample_rate) < count:
-        end = start + float(rng.uniform(2, 5))
-        rate = float(rng.uniform(3, 6))
-        syllable_start = start
-
-        while syllable_start < end:
-            duration = float(rng.uniform(0.08, 0.3))
-            first = round(syllable_start * sample_rate)
-            syllable_end = min(end, syllable_start + duration)
-            last = min(count, round(syllable_end * sample_rate))
-
-            burst_samples = max(0, last - first)
-            angles = np.linspace(0, 2 * np.pi, burst_samples)
-            burst = 0.5 - 0.5 * np.cos(angles)
-            envelope[first:last] = np.maximum(envelope[first:last], burst)
-            syllable_start += 1 / rate
-
-        start = end + float(rng.uniform(0.3, 1.5))
-
-    return envelope
-
-
-# Returns the harmonic part of one whole recording. Each harmonic keeps the same
-# random phase for the recording.
-def _harmonics(count, sample_rate, rng) -> np.ndarray:
-    time = np.arange(count, dtype=np.float64)
-    time /= sample_rate
-
-    fundamental = float(rng.uniform(90, 220))
-    audio = np.zeros(count)
-
-    for harmonic in range(1, 21):
-        phase = float(rng.uniform(0, 2 * np.pi))
-
-        if harmonic * fundamental < 20000:
-            # Reuse one temporary array while making each harmonic.
-            sound = 2 * np.pi * harmonic * fundamental * time
-            sound += phase
-            np.sin(sound, out=sound)
-            sound /= harmonic
-            audio += sound
-            del sound
-
-    return audio
-
-
-# Returns shaped noise for one whole recording. The FFT still covers the whole
-# recording, but its frequency gains are measured in small pieces to save
-# memory.
-def _shaped_noise(count, sample_rate, recipe, rng) -> np.ndarray:
-    white_noise = rng.standard_normal(count)
-    spectrum = np.fft.rfft(white_noise)
-    del white_noise
-
-    spacing = 1 / (count * (1 / sample_rate))
-
-    for first in range(0, len(spectrum), 262144):
-        end = min(first + 262144, len(spectrum))
-        frequencies = np.arange(first, end, dtype=np.float64)
-        frequencies *= spacing
-
-        gain = shape_gain_db(frequencies, recipe)
-        gain /= 20
-        np.power(10, gain, out=gain)
-        spectrum[first:end] *= gain
-
-        del frequencies
-        del gain
-
-    noise = np.fft.irfft(spectrum, count)
-    del spectrum
-
-    return noise
-
-
-# Returns one complete synthetic recording at RMS 0.1 from namespace 10. Large
-# temporary arrays are released before making the next part.
-def synthetic_background(index, settings) -> np.ndarray:
-    seed = np.random.SeedSequence([settings["seed"], 10, index])
-    rng = np.random.default_rng(seed)
-    sample_rate = settings["sample_rate"]
-    count = round(settings["sources"]["synthetic_recording_seconds"] * sample_rate)
-
-    audio = _harmonics(count, sample_rate, rng)
-    harmonic_rms = np.sqrt(np.dot(audio, audio) / count)
-
-    # The source recipe supplies only the noise shape, without tones or thumps.
-    recording_id = f"synthetic-bg-{index:04d}"
-    recipe = synthetic_source(recording_id, rng)
-    noise = _shaped_noise(count, sample_rate, recipe, rng)
-    noise_rms = np.sqrt(np.dot(noise, noise) / count)
-    noise *= harmonic_rms * 10 ** (-10 / 20) / noise_rms
-    audio += noise
-    del noise
-
-    envelope = _envelope(count, sample_rate, rng)
-    audio *= envelope
-    del envelope
-
-    rms = np.sqrt(np.dot(audio, audio) / count)
-    audio *= 0.1 / rms
-
-    return audio
-
-
-# Returns the background folder, written the way it was given and with forward
-# slashes, after writing each recording as FLOAT WAV. The run's settings.json
-# saves this folder, so it stays relative to the project root instead of
-# naming this computer's full path. Only one recording is kept in memory at a
-# time.
-def write_synthetic_backgrounds(folder, settings) -> str:
-    folder = Path(folder)
-    folder.mkdir(parents=True, exist_ok=True)
-
-    for index in range(settings["sources"]["n_synthetic_recordings"]):
-        audio = synthetic_background(index, settings)
-        path = folder / f"synthetic-bg-{index:04d}.wav"
-        sf.write(path, audio, settings["sample_rate"], subtype="FLOAT")
-        del audio
-        print(f"wrote background {index + 1}/{settings['sources']['n_synthetic_recordings']}", flush=True)
-
-    return folder.as_posix()
-
-
 # ********************************
 # Reading recordings
 # ********************************
@@ -163,7 +25,7 @@ def _wav_paths(settings) -> dict:
     folder = settings["sources"]["source_dir"]
 
     if not folder:
-        raise ValueError("sources.source_dir must name written backgrounds")
+        raise ValueError("sources.source_dir must name a folder of WAV recordings")
 
     paths = {}
 

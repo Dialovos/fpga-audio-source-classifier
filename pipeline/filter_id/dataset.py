@@ -5,22 +5,18 @@ Each example is a source clip filtered with a known Butterworth filter, with noi
 added before or after the filter and 24-bit rounding at the end. The filter it used
 becomes its label, and its record (pipeline.records) says exactly what was done.
 
-Until the team's recordings are ready, the sources are synthetic. Each source is
-noise with its own random spectral shape (a tilt plus a few bumps), and some get a
-steady tone or a thump on top. A source keeps its shape across all its examples,
-like a real recording would, and the shape is picked independently of the filter.
-That way the model can't learn "this source never has much low end" in place of
-the filter. Set "source_dir" to a folder of mono WAV files at the run's sample rate
-to train on real recordings instead.
+The sources are the mono WAV files in the run's "source_dir", at the run's sample
+rate. Each example is a random piece of one source, and the filter is picked
+independently of the source, so the model can't learn "this recording never has
+much low end" in place of the filter.
 
 Debugging tip: every example rebuilds on its own from (settings, index). If one
 looks wrong, call make_example(index, make_sources(settings), settings) and look at
 the audio and the record it returns.
 
-This file has six groups:
+This file has five groups:
     * Checking settings
-    * Synthetic sources
-    * Real recordings
+    * Recordings
     * Rendering a source clip
     * Random filters
     * Making examples
@@ -38,44 +34,12 @@ from pipeline.degrade import STAGES, add_noise, quantize
 from pipeline.filter_id.features import spectrum_features
 from pipeline.filters import FILTER_TYPES, apply_filter
 from pipeline.records import build_record, example_seed
-from pipeline.signals import thump, tone
 
 # Every source clip is scaled to this level (RMS) before it's filtered.
 SOURCE_RMS = 0.1
 
 # build_dataset reports its progress every this many examples.
 PROGRESS_EVERY = 500
-
-# Ranges for the synthetic source recipes. Changing any of these changes the dataset.
-#
-# The spectral tilt, in dB per octave, measured around TILT_PIVOT_HZ.
-# The tilt only applies inside TILT_RANGE_HZ and stays flat outside it.
-SLOPE_DB_PER_OCTAVE = (-6.0, 3.0)
-TILT_PIVOT_HZ = 1000.0
-TILT_RANGE_HZ = (20.0, 20_000.0)
-
-# Each source gets 0 to MAX_BUMPS bumps (boosts or dips) in its spectrum.
-MAX_BUMPS = 3
-BUMP_CENTER_HZ = (40.0, 20_000.0)
-BUMP_WIDTH_OCTAVES = (0.3, 1.5)
-BUMP_GAIN_DB = (-12.0, 12.0)
-
-# Some sources get a steady tone on top. Its level is relative to SOURCE_RMS.
-TONE_CHANCE = 0.4
-TONE_FREQ_HZ = (40.0, 2000.0)
-TONE_LEVEL_DB = (-20.0, 0.0)
-
-# Some sources get a thump on top. Its level is relative to SOURCE_RMS,
-# its peak is THUMP_PEAK_FACTOR times that level, and it starts somewhere in
-# the first THUMP_LATEST_ONSET (80%) of the clip.
-THUMP_CHANCE = 0.3
-THUMP_FREQ_HZ = (30.0, 200.0)
-THUMP_LEVEL_DB = (-12.0, 6.0)
-THUMP_PEAK_FACTOR = 4
-THUMP_LATEST_ONSET = 0.8
-
-# Keeps the random stream for source recipes separate from the examples' seeds.
-SOURCES_SPAWN_KEY = (1,)
 
 
 # Everything build_dataset makes. Each field has one entry per example, in example
@@ -102,6 +66,7 @@ class Dataset:
 _REQUIRED_SETTINGS = (
     "seed",
     "sample_rate",
+    "source_dir",
     "clip_seconds",
     "examples_per_source",
     "test_fraction",
@@ -122,17 +87,15 @@ _REQUIRED_FILTER_SETTINGS = (
 )
 
 
-# Stops if a run's settings (see pipeline/filter_id/settings.json) are missing
-# something or don't make sense. The ValueError names the first bad or missing
-# setting it finds.
+# Stops if a run's settings are missing something or don't make sense. The
+# ValueError names the first bad or missing setting it finds.
 def check_settings(settings: dict) -> None:
     for key in _REQUIRED_SETTINGS:
         if key not in settings:
             raise ValueError(f'settings are missing "{key}"')
 
-    # Without a folder of recordings, we need to know how many synthetic sources to make.
-    if not settings.get("source_dir") and "n_sources" not in settings:
-        raise ValueError('settings need "n_sources" when there is no "source_dir"')
+    if not isinstance(settings["source_dir"], str) or not settings["source_dir"]:
+        raise ValueError('"source_dir" must name a folder of mono WAV files')
 
     if settings["examples_per_source"] < 1:
         raise ValueError(f"examples_per_source must be at least 1, got {settings['examples_per_source']}")
@@ -166,84 +129,7 @@ def check_settings(settings: dict) -> None:
 
 
 # ********************************
-# Synthetic sources
-# ********************************
-
-
-# Returns a random number between low and high where every octave is equally
-# likely. For example, 100-200 Hz comes up as often as 1-2 kHz.
-def _log_uniform(rng: np.random.Generator, low: float, high: float) -> float:
-    log_value = rng.uniform(np.log(low), np.log(high))
-
-    return float(np.exp(log_value))
-
-
-# Returns one random bump (a boost or a dip) for a source's spectral shape.
-def _random_bump(rng: np.random.Generator) -> dict:
-    center_hz = _log_uniform(rng, *BUMP_CENTER_HZ)
-    width_octaves = float(rng.uniform(*BUMP_WIDTH_OCTAVES))
-    gain_db = float(rng.uniform(*BUMP_GAIN_DB))
-
-    return {"center_hz": center_hz, "width_octaves": width_octaves, "gain_db": gain_db}
-
-
-# Returns a random recipe for one synthetic source. The recipe has a spectral
-# tilt, 0 to MAX_BUMPS bumps, and maybe a steady tone and/or a thump, and it stays
-# the same for every example drawn from this source. The recording_id names the
-# source so the data can be split by source, and rng is the random stream for
-# source recipes.
-def synthetic_source(recording_id: str, rng: np.random.Generator) -> dict:
-    # The order of these random draws decides the recipes, so don't reorder them.
-    slope = float(rng.uniform(*SLOPE_DB_PER_OCTAVE))
-    n_bumps = int(rng.integers(0, MAX_BUMPS + 1))
-
-    bumps = []
-    for _ in range(n_bumps):
-        bumps.append(_random_bump(rng))
-
-    source = {
-        "recording_id": recording_id,
-        "kind": "synthetic",
-        "slope_db_per_octave": slope,
-        "bumps": bumps,
-    }
-
-    if rng.random() < TONE_CHANCE:
-        freq_hz = _log_uniform(rng, *TONE_FREQ_HZ)
-        level_db = float(rng.uniform(*TONE_LEVEL_DB))
-        source["tone"] = {"freq_hz": freq_hz, "level_db": level_db}
-
-    if rng.random() < THUMP_CHANCE:
-        freq_hz = _log_uniform(rng, *THUMP_FREQ_HZ)
-        level_db = float(rng.uniform(*THUMP_LEVEL_DB))
-        source["thump"] = {"freq_hz": freq_hz, "level_db": level_db}
-
-    return source
-
-
-# Returns a synthetic source's spectral shape, which is its boost or cut in dB at
-# each frequency. The shape is the tilt plus one bell curve per bump.
-def shape_gain_db(freqs: np.ndarray, source: dict) -> np.ndarray:
-    # The tilt: so many dB per octave above or below the pivot frequency.
-    # Clipping the frequencies to TILT_RANGE_HZ keeps the tilt flat outside that range.
-    clipped_freqs = np.clip(freqs, *TILT_RANGE_HZ)
-    octaves_from_pivot = np.log2(clipped_freqs / TILT_PIVOT_HZ)
-    gain = source["slope_db_per_octave"] * octaves_from_pivot
-
-    # Each bump: a bell curve on a log-frequency axis, centered on the bump's frequency.
-    for bump in source["bumps"]:
-        # How far each frequency is from the bump's center, in bump widths.
-        # The 1 Hz floor avoids taking the log of 0 Hz.
-        octaves_from_center = np.log2(np.maximum(freqs, 1.0) / bump["center_hz"])
-        distance = octaves_from_center / bump["width_octaves"]
-
-        gain = gain + bump["gain_db"] * np.exp(-0.5 * distance**2)
-
-    return gain
-
-
-# ********************************
-# Real recordings
+# Recordings
 # ********************************
 
 
@@ -281,21 +167,9 @@ def wav_sources(source_dir, sample_rate: int, clip_seconds: float) -> list[dict]
     return sources
 
 
-# Returns every source for a run. If the settings have a "source_dir", the sources
-# are the WAV files in it. Otherwise they're n_sources synthetic recipes.
+# Returns every source for a run: the WAV files in its source_dir.
 def make_sources(settings: dict) -> list[dict]:
-    if settings.get("source_dir"):
-        return wav_sources(settings["source_dir"], settings["sample_rate"], settings["clip_seconds"])
-
-    seed_sequence = np.random.SeedSequence(settings["seed"], spawn_key=SOURCES_SPAWN_KEY)
-    rng = np.random.default_rng(seed_sequence)
-
-    sources = []
-    for k in range(settings["n_sources"]):
-        recording_id = f"synthetic-{k:04d}"
-        sources.append(synthetic_source(recording_id, rng))
-
-    return sources
+    return wav_sources(settings["source_dir"], settings["sample_rate"], settings["clip_seconds"])
 
 
 # ********************************
@@ -314,49 +188,12 @@ def _render_wav_clip(source: dict, n_samples: int, rng: np.random.Generator) -> 
     return audio
 
 
-# Returns a fresh clip of a synthetic source: shaped noise, plus its tone and
-# thump if it has them.
-def _render_synthetic_clip(source: dict, seconds: float, sample_rate: int, rng: np.random.Generator) -> np.ndarray:
-    n_samples = round(seconds * sample_rate)
-
-    # Make white noise and move it into the frequency domain.
-    spectrum = np.fft.rfft(rng.standard_normal(n_samples))
-    freqs = np.fft.rfftfreq(n_samples, 1 / sample_rate)
-
-    # Shape it: turn the source's dB shape into a multiplier, apply it, and come back to audio.
-    multiplier = 10 ** (shape_gain_db(freqs, source) / 20)
-    audio = np.fft.irfft(spectrum * multiplier, n_samples)
-
-    audio *= SOURCE_RMS / np.sqrt(np.mean(audio**2))
-
-    if "tone" in source:
-        # The tone's level in dB is relative to SOURCE_RMS. A sine's peak is sqrt(2) times its RMS.
-        level = SOURCE_RMS * 10 ** (source["tone"]["level_db"] / 20)
-        peak = level * np.sqrt(2)
-
-        audio = audio + tone(source["tone"]["freq_hz"], seconds, sample_rate, amplitude=peak)
-
-    if "thump" in source:
-        # The thump starts at a random time and can't peak past full scale (1.0).
-        level = SOURCE_RMS * 10 ** (source["thump"]["level_db"] / 20)
-        onset = float(rng.uniform(0.0, THUMP_LATEST_ONSET * seconds))
-        peak = min(1.0, THUMP_PEAK_FACTOR * level)
-
-        audio = audio + thump(seconds, sample_rate, onset_s=onset, freq_hz=source["thump"]["freq_hz"], amplitude=peak)
-
-    return audio
-
-
-# Returns one clip of a source, scaled to SOURCE_RMS. Synthetic sources get fresh
-# noise each time, and WAV sources get a random piece of the file. It stops with a
-# ValueError if the clip comes out silent (for example, a silent stretch of a WAV
+# Returns a random piece of a source, scaled to SOURCE_RMS. It stops with a
+# ValueError if the piece comes out silent (for example, a silent stretch of the
 # file).
 def render_source(source: dict, seconds: float, sample_rate: int, rng: np.random.Generator) -> np.ndarray:
-    if source["kind"] == "wav":
-        n_samples = round(seconds * sample_rate)
-        audio = _render_wav_clip(source, n_samples, rng)
-    else:
-        audio = _render_synthetic_clip(source, seconds, sample_rate, rng)
+    n_samples = round(seconds * sample_rate)
+    audio = _render_wav_clip(source, n_samples, rng)
 
     # A silent clip can't be scaled to a level.
     rms = np.sqrt(np.mean(audio**2))
@@ -370,6 +207,14 @@ def render_source(source: dict, seconds: float, sample_rate: int, rng: np.random
 # ********************************
 # Random filters
 # ********************************
+
+
+# Returns a random number between low and high where every octave is equally
+# likely. For example, 100-200 Hz comes up as often as 1-2 kHz.
+def _log_uniform(rng: np.random.Generator, low: float, high: float) -> float:
+    log_value = rng.uniform(np.log(low), np.log(high))
+
+    return float(np.exp(log_value))
 
 
 # Returns a random Butterworth filter spec, using the run's filter settings. The

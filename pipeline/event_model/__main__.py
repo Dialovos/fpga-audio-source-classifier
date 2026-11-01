@@ -24,7 +24,7 @@ from pipeline.event_model.features import add_context, frame_features
 from pipeline.event_model.labels import EVENT_TYPES
 from pipeline.event_model.model import EventModel, evaluate, load_model, prepare_clip, save_model
 from pipeline.event_model.settings import check_settings
-from pipeline.event_model.sources import load_split, make_split, recordings, save_split, write_synthetic_backgrounds
+from pipeline.event_model.sources import load_split, make_split, recordings, save_split
 from pipeline.filter_id.model import load_model as load_filter_id
 from pipeline.records import load_settings, to_jsonable
 
@@ -93,9 +93,6 @@ def train(args) -> None:
         raise ValueError("out already contains model.joblib")
 
     times = {}
-
-    if settings["sources"]["source_dir"] is None:
-        settings["sources"]["source_dir"] = write_synthetic_backgrounds(out / "backgrounds", settings)
 
     items = recordings(settings)
 
