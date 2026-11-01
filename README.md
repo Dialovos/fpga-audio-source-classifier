@@ -34,6 +34,12 @@ The C filter in `pipeline/reversable_filters/` has its own checks, which build i
 python -m pytest pipeline/tests/check_c_filter.py
 ```
 
+## Pipeline walkthrough
+
+The easiest way to try everything is `pipeline-walkthrough.ipynb` in the repo root. It takes one sound through the whole pipeline: it filters it, adds noise, has the filter ID model guess the filter, and undoes the filter with the real settings and with the guess. It saves every version as a WAV so you can listen to it in a DAW. Then it trains or loads the event model on the team's voiceovers, plots a test clip, runs the four-version comparison, finds the events in a WAV, and runs the tests.
+
+Open it in VS Code or Jupyter with the `.venv` kernel. Change `pipeline-walkthrough-settings.json` to try a different sound, filter, noise level, or model, then rerun the cells. The notebook's first cell lists what each setting does. The voiceovers go in `data/test-data-prelim/`.
+
 ## Filter ID model (first AI layer)
 
 Predict the filter on mono WAV files at the model's sample rate (192 kHz):
@@ -46,7 +52,7 @@ Each prediction prints as one JSON line with a `spec` (type, family, order, cuto
 
 ## Event model (second AI layer)
 
-The event model finds rumble, hiss, and transients (clicks and knocks) in the audio, and gives each one a start, an end, and a confidence. The easiest way in is the notebook, `pipeline/notebooks/le-event-model.ipynb`. It trains the model on the team's voiceovers, plots a test clip, and runs the comparison. Open it in VS Code or Jupyter with the `.venv` kernel, and put the voiceovers in `data/test-data-prelim/` first.
+The event model finds rumble, hiss, and transients (clicks and knocks) in the audio, and gives each one a start, an end, and a confidence.
 
 To train it from the command line (takes ~6 minutes):
 
@@ -74,4 +80,4 @@ It writes the scores to `metrics.json`, one line per test case to `cases.jsonl`,
 
 ## Status
 
-The filter ID model is in `pipeline/filter_id/` and the event model is in `pipeline/event_model/`, with their tests in `pipeline/tests/`. The functions they share (filters, test sounds, noise and rounding, records, and the Python copy of the C inverse in `compensation.py`) are in `pipeline/`. The compensation filter's C code is in `pipeline/reversable_filters/`.
+The filter ID model is in `pipeline/filter_id/` and the event model is in `pipeline/event_model/`, with their tests in `pipeline/tests/`. The functions they share (filters, test sounds, noise and rounding, records, and the Python copy of the C inverse in `compensation.py`) are in `pipeline/`. The compensation filter's C code is in `pipeline/reversable_filters/`. The functions the walkthrough notebook calls are in `pipeline/walkthrough.py`.

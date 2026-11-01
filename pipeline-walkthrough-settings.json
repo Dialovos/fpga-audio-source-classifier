@@ -1,0 +1,38 @@
+{
+  "seed": 4240,
+  "sample_rate": 192000,
+  "sound": {
+    "kind": "wav",
+    "wav": "data/test-data-prelim/VO1.wav",
+    "start_s": 30.0,
+    "seconds": 1.0,
+    "freq_hz": 100
+  },
+  "filter": {
+    "type": "bandpass",
+    "family": "butter",
+    "order": 4,
+    "cutoff": [250, 6000]
+  },
+  "noise": {
+    "snr_db": 30,
+    "stage": "after_filter"
+  },
+  "bits": 24,
+  "filter_id_model": "results/2026-10-26-le-filter-id-hp-lp-bandpass/model.joblib",
+  "undo": {
+    "method": "python",
+    "c_command": "pipeline/reversable_filters/filter"
+  },
+  "out_dir": "results/pipeline-walkthrough",
+  "event_model": {
+    "settings_file": "pipeline/event_model/settings.json",
+    "voiceover_dir": "data/test-data-prelim",
+    "run_dir": "results/2026-10-31-le-event-model-voiceovers",
+    "seed": 4240,
+    "train_clips": 200,
+    "tune_clips": 40,
+    "test_clip": 0,
+    "detect_wav": "data/test-data-prelim/VO3.wav"
+  }
+}
