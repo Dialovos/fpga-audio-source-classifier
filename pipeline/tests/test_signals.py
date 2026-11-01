@@ -1,4 +1,5 @@
-"""Checks for the simple test sounds.
+"""
+Checks for the simple test sounds.
 
 The proposal's real data is 10-20 source recordings, with synthetic tones allowed as a supplement.
 These sounds stand in until we have the recordings. Everything runs at 192 kHz, the proposal's sample rate.
@@ -12,6 +13,7 @@ from pipeline.signals import thump, tone, white_noise
 FS = 192_000
 
 
+# Returns the frequency in Hz where the audio's spectrum is strongest.
 def peak_frequency(audio: np.ndarray) -> float:
     spectrum = np.abs(np.fft.rfft(audio))
     return np.fft.rfftfreq(len(audio), 1 / FS)[np.argmax(spectrum)]

@@ -1,4 +1,5 @@
-"""Checks for added noise and bit-depth rounding.
+"""
+Checks for added noise and bit-depth rounding.
 
 Everything runs at 192 kHz, and rounding defaults to 24-bit, like the proposal's source recordings.
 """
@@ -11,6 +12,8 @@ from pipeline.degrade import add_noise, quantize
 FS = 192_000
 
 
+# Returns a sine wave at freq_hz with the given peak amplitude, seconds long, at
+# 192 kHz.
 def sine(freq_hz: float, amplitude: float, seconds: float = 1.0) -> np.ndarray:
     t = np.arange(int(seconds * FS)) / FS
     return amplitude * np.sin(2 * np.pi * freq_hz * t)
@@ -119,3 +122,41 @@ def test_quantize_clips_and_counts_overloads():
 def test_quantize_rejects_bad_settings(settings):
     with pytest.raises(ValueError):
         quantize(sine(440, 0.5), **settings)
+
+
+# Tests: a supplied power fixes the noise level even when the input level changes.
+# Why: both noise stages must use the clean clip's power and the same noise.
+def test_given_noise_reference_and_old_audio():
+    clean = sine(440, 0.5)
+    power = float(np.mean(clean**2))
+
+    rng = np.random.default_rng(9)
+    old, old_record = add_noise(clean, 20, rng, stage="after_filter")
+
+    rng = np.random.default_rng(9)
+    given, record = add_noise(clean, 20, rng, stage="after_filter", reference_power=power)
+
+    quiet_audio = clean / 10
+    rng = np.random.default_rng(9)
+    quiet, _ = add_noise(quiet_audio, 20, rng, stage="after_filter", reference_power=power)
+
+    np.testing.assert_array_equal(old, given)
+    np.testing.assert_allclose(quiet - clean / 10, given - clean, atol=1e-16)
+
+    assert np.mean((quiet - clean / 10)**2) == pytest.approx(power / 100)
+    assert old_record["snr_reference"] == "input"
+    assert "reference_power" not in old_record
+    assert record["snr_reference"] == "given"
+    assert record["reference_power"] == power
+
+
+# Tests: bad reference powers stop before noise is drawn.
+# Why: a non-positive, non-finite, or non-number value cannot define an SNR.
+def test_bad_noise_references_stop():
+    audio = np.ones(10)
+
+    for reference in (0, -1, np.inf, np.nan, "1", True):
+        rng = np.random.default_rng(1)
+
+        with pytest.raises(ValueError, match="reference_power"):
+            add_noise(audio, 20, rng, stage="after_filter", reference_power=reference)

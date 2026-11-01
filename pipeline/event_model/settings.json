@@ -1,0 +1,214 @@
+{
+  "seed": 4240,
+  "sample_rate": 192000,
+  "clip_seconds": 10.0,
+  "edge_margin_s": 0.25,
+  "bits": 24,
+  "sources": {
+    "source_dir": null,
+    "recording_groups": {},
+    "n_synthetic_recordings": 4,
+    "synthetic_recording_seconds": 120
+  },
+  "split": {
+    "test_recordings": 1,
+    "tune_fraction": 0.25,
+    "guard_seconds": 10.0,
+    "test_recording_ids": []
+  },
+  "clips": {
+    "train_clips": 200,
+    "tune_clips": 40,
+    "train_noise_chance": 0.8,
+    "conditions_per_test_clip": 2,
+    "export_examples": 2
+  },
+  "noise": {
+    "snr_db": [
+      20,
+      40
+    ],
+    "stages": [
+      "before_filter",
+      "after_filter"
+    ]
+  },
+  "filters": {
+    "types": [
+      "highpass",
+      "lowpass",
+      "bandpass"
+    ],
+    "orders": {
+      "highpass": [
+        1,
+        2,
+        4
+      ],
+      "lowpass": [
+        1,
+        2,
+        4
+      ],
+      "bandpass": [
+        2,
+        4,
+        8
+      ]
+    },
+    "highpass_cutoff_hz": [
+      80,
+      1000
+    ],
+    "lowpass_cutoff_hz": [
+      2000,
+      16000
+    ],
+    "bandpass_low_hz": [
+      80,
+      1000
+    ],
+    "bandpass_high_hz": [
+      2000,
+      16000
+    ]
+  },
+  "events": {
+    "per_clip": [
+      0,
+      2
+    ],
+    "same_type_gap_s": 0.3,
+    "rumble": {
+      "cutoff_hz": [
+        40,
+        150
+      ],
+      "hum_hz": [
+        25,
+        80
+      ],
+      "hum_db": [
+        -6,
+        0
+      ],
+      "duration_s": [
+        0.5,
+        3.0
+      ],
+      "fade_s": [
+        0.05,
+        0.2
+      ],
+      "level_db": [
+        -12,
+        0
+      ]
+    },
+    "hiss": {
+      "cutoff_hz": [
+        4000,
+        8000
+      ],
+      "duration_s": [
+        0.5,
+        3.0
+      ],
+      "fade_s": [
+        0.02,
+        0.1
+      ],
+      "level_db": [
+        -24,
+        -6
+      ]
+    },
+    "transient": {
+      "freq_hz": [
+        80,
+        1000
+      ],
+      "knock_decay_s": [
+        0.005,
+        0.02
+      ],
+      "click_decay_s": [
+        0.0005,
+        0.003
+      ],
+      "peak_db": [
+        6,
+        14
+      ]
+    }
+  },
+  "features": {
+    "hop": 1920,
+    "short_window": 4096,
+    "long_window": 16384,
+    "short_bands": 32,
+    "short_min_hz": 200,
+    "short_max_hz": 24000,
+    "long_bands": 8,
+    "long_min_hz": 20,
+    "long_max_hz": 400,
+    "context": 3
+  },
+  "model": {
+    "max_iter": 200,
+    "learning_rate": 0.1,
+    "max_leaf_nodes": 31,
+    "train_frame_step": 2
+  },
+  "decoding": {
+    "rumble": {
+      "smooth_frames": 5,
+      "merge_gap_s": 0.05,
+      "min_duration_s": 0.2
+    },
+    "hiss": {
+      "smooth_frames": 5,
+      "merge_gap_s": 0.05,
+      "min_duration_s": 0.2
+    },
+    "transient": {
+      "smooth_frames": 1,
+      "merge_gap_s": 0,
+      "min_duration_s": 0
+    },
+    "threshold_grid": [
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9,
+      0.95
+    ]
+  },
+  "scoring": {
+    "onset_collar_s": {
+      "rumble": 0.2,
+      "hiss": 0.2,
+      "transient": 0.05
+    },
+    "offset_collar_s": 0.2,
+    "offset_fraction": 0.2,
+    "offset_types": [
+      "rumble",
+      "hiss"
+    ]
+  }
+}
