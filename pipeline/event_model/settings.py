@@ -77,6 +77,10 @@ def _range(value, name, low=-np.inf, high=np.inf, whole=False) -> None:
 def check_settings(settings) -> None:
     path = Path(__file__).with_name("settings.json")
     defaults = json.loads(path.read_text(encoding="utf-8"))
+
+    # Each run names its own recording groups, so only the groups dict itself is
+    # required, not the default's entries.
+    defaults["sources"]["recording_groups"] = {}
     _required(settings, defaults)
 
     _number(settings["seed"], "seed", 0, whole=True)
@@ -132,11 +136,8 @@ def check_settings(settings) -> None:
 def _check_sources_split(settings) -> None:
     sources = settings["sources"]
 
-    if sources["source_dir"] is not None and not isinstance(sources["source_dir"], str):
-        raise ValueError("sources.source_dir must be a path or null")
-
-    _number(sources["n_synthetic_recordings"], "sources.n_synthetic_recordings", 1, whole=True)
-    _number(sources["synthetic_recording_seconds"], "sources.synthetic_recording_seconds", settings["clip_seconds"])
+    if not isinstance(sources["source_dir"], str) or not sources["source_dir"]:
+        raise ValueError("sources.source_dir must name a folder of WAV recordings")
 
     split = settings["split"]
     _number(split["test_recordings"], "split.test_recordings", 1, whole=True)

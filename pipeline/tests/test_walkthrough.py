@@ -524,8 +524,8 @@ def test_comparison_with_filter_id(notebook_run, monkeypatch, capsys):
     folder = notebook_run["folder"]
     filter_id_path = folder / "filter-id.joblib"
     filter_id_path.touch()
-    settings_path = ROOT / "pipeline" / "filter_id" / "settings.json"
-    filter_settings = load_settings(settings_path)
+    features = {"n_bands": 96, "f_min_hz": 20, "f_max_hz": 24000, "segment": 32768}
+    filter_settings = {"sample_rate": FS, "features": features}
     spec = {"type": "highpass", "family": "butter", "order": 1, "cutoff": 100}
     filter_model = SimpleNamespace(predict=lambda rows: [{"spec": spec}])
     monkeypatch.setattr(commands, "load_filter_id", lambda path: (filter_model, filter_settings))

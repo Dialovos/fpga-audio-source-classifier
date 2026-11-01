@@ -19,7 +19,7 @@
     "stage": "after_filter"
   },
   "bits": 24,
-  "filter_id_model": "results/2026-10-26-le-filter-id-hp-lp-bandpass/model.joblib",
+  "filter_id_model": "local/results/2026-10-26-le-filter-id-hp-lp-bandpass/model.joblib",
   "undo": {
     "method": "python",
     "c_command": "pipeline/reversable_filters/filter"
