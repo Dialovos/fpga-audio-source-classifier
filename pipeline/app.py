@@ -91,6 +91,8 @@ MAX_LISTED_EVENTS = 20
 # The dictionary holds the filter ID model, its settings, the event model, its
 # settings, and the sample rate both expect, under the keys "filter_id",
 # "filter_id_settings", "event_model", "event_settings", and "sample_rate".
+def load_models(filter_id_path, event_model_path) -> dict:
+    pass
 
 
 # check_files
@@ -108,6 +110,8 @@ MAX_LISTED_EVENTS = 20
 # folders, since their outputs would be saved under the same names and write over
 # each other. Every message has to name the file, so people know which one to
 # fix.
+def check_files(paths, sample_rate, min_seconds) -> None:
+    pass
 
 
 # ********************************
@@ -125,6 +129,8 @@ MAX_LISTED_EVENTS = 20
 # features made exactly the way its training features were, so make the spectrum
 # features from the audio with the feature settings saved with the filter ID
 # model.
+def identify_filter(audio, models) -> dict:
+    pass
 
 
 # find_events
@@ -136,6 +142,8 @@ MAX_LISTED_EVENTS = 20
 # the settings saved with the event model, because the test compares its events
 # with what python -m pipeline.event_model detect finds in the same file. Reading
 # how detect does it in pipeline/event_model/__main__.py is the quickest way in.
+def find_events(audio, models) -> list[dict]:
+    pass
 
 
 # analyze_file
@@ -159,6 +167,8 @@ MAX_LISTED_EVENTS = 20
 # name, not its folder), the sample rate, the length in seconds, the filter guess,
 # the compensation record, and the events, under the keys "file",
 # "sample_rate", "duration_s", "filter", "compensation", and "events".
+def analyze_file(path, models, method="python", command=None) -> tuple[dict, np.ndarray]:
+    pass
 
 
 # ********************************
@@ -180,6 +190,8 @@ MAX_LISTED_EVENTS = 20
 # readable JSON; numpy numbers can't go into JSON directly, and pipeline.records
 # has a helper that turns them into plain ones. It gives back the two paths, the
 # audio's first.
+def write_outputs(out, report, compensated) -> tuple[Path, Path]:
+    pass
 
 
 # describe_filter
@@ -189,6 +201,8 @@ MAX_LISTED_EVENTS = 20
 # or both edges for a band-pass, whose cutoff is a [low, high] pair. For example
 # "band-pass, order 4, 250 Hz to 6000 Hz", "high-pass, order 2, 312 Hz", or
 # "low-pass, order 1, 8000 Hz".
+def describe_filter(spec) -> str:
+    pass
 
 
 # count_events
@@ -198,6 +212,8 @@ MAX_LISTED_EVENTS = 20
 # count, in the order to show them, and lists every type, including the ones with
 # none. The types come from the event model itself (its classes) instead of being
 # written into the app, since the event model is going from 3 types to 7.
+def count_events(events, types) -> str:
+    pass
 
 
 # summary
@@ -222,6 +238,8 @@ MAX_LISTED_EVENTS = 20
 #       Events: 3 (rumble 1, hiss 0, transient 2)
 #         rumble        0.50 s to     1.75 s, confidence 0.80
 #         ...
+def summary(report, types) -> str:
+    pass
 
 
 # ********************************
@@ -249,3 +267,5 @@ MAX_LISTED_EVENTS = 20
 #
 # At the very bottom of the file, the usual if __name__ == "__main__" line calls
 # main, so python -m pipeline.app works.
+def main(argv=None) -> None:
+    pass
