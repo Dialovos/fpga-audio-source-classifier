@@ -40,26 +40,46 @@ This file has four groups:
 #     * Comments like the other files: a # summary right above each function
 #       saying what it returns and when it stops, and a banner per group (the
 #       ones below). Delete these TO DO notes when you're done.
-#     * Ruff has to pass: ruff check pipeline --line-length 120
+#     * Ruff has to pass: ruff check pipeline --line-length 120. At the end,
+#       delete the ruff noqa line above the imports and run it again.
 #     * Don't change the tests. If one looks wrong, ask first.
 #
 # When everything passes, add an "Offline app" section to the README with the
 # command above, then open a PR.
 # ============================================================================
 
-# Imports you'll need (most of the work is calling code that already exists):
-#     argparse, json, sys, and Path from pathlib
-#     numpy as np, soundfile as sf
-#     compensate                    from pipeline.compensation
-#     add_context, frame_features   from pipeline.event_model.features
-#     load_model                    from pipeline.event_model.model (import it as load_event_model)
-#     spectrum_features             from pipeline.filter_id.features
-#     FilterIdModel, load_model     from pipeline.filter_id.model (import load_model as load_filter_id)
-#     to_jsonable                   from pipeline.records
+# The imports and the two constants below are already set up. Most of the work
+# is calling code that already exists.
 #
-# Two constants:
-#     FILTER_NAMES = {"highpass": "high-pass", "lowpass": "low-pass", "bandpass": "band-pass"}
-#     MAX_LISTED_EVENTS = 20    (the summary lists each event only up to this many)
+# The line right below tells ruff not to flag imports that aren't used yet.
+# Delete it once all your functions are written, so ruff can catch any import
+# you didn't end up needing.
+# ruff: noqa: F401
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+import soundfile as sf
+
+from pipeline.compensation import compensate
+from pipeline.event_model.features import add_context, frame_features
+from pipeline.event_model.model import load_model as load_event_model
+from pipeline.filter_id.features import spectrum_features
+from pipeline.filter_id.model import FilterIdModel
+from pipeline.filter_id.model import load_model as load_filter_id
+from pipeline.records import to_jsonable
+
+# How each filter type is written in the summary.
+FILTER_NAMES = {"highpass": "high-pass", "lowpass": "low-pass", "bandpass": "band-pass"}
+
+# The summary lists each event only when there are this many or fewer, so a long
+# recording doesn't flood the terminal. The report always has every event.
+MAX_LISTED_EVENTS = 20
 
 # ********************************
 # Loading the models and checking the files
