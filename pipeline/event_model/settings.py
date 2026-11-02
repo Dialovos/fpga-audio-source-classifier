@@ -14,6 +14,8 @@ from pathlib import Path
 
 import numpy as np
 
+from pipeline.event_model.labels import EVENT_TYPES, SHORT_TYPES
+
 # ********************************
 # Small setting checks
 # ********************************
@@ -96,8 +98,9 @@ def check_settings(settings) -> None:
     _check_features_model(settings)
     _check_events(settings)
     _check_filters_noise(settings)
+    _check_pretrained(settings)
 
-    for kind in ("rumble", "hiss", "transient"):
+    for kind in EVENT_TYPES:
         decoding = settings["decoding"][kind]
         _number(decoding["smooth_frames"], f"decoding.{kind}.smooth_frames", 1, whole=True)
 
@@ -127,7 +130,7 @@ def check_settings(settings) -> None:
         raise ValueError("scoring.offset_types must list event types")
 
     for kind in offset_types:
-        if kind not in ("rumble", "hiss", "transient"):
+        if kind not in EVENT_TYPES:
             raise ValueError("scoring.offset_types must list event types")
 
 
@@ -219,7 +222,7 @@ def _check_events(settings) -> None:
     _range(events["per_clip"], "events.per_clip", 0, whole=True)
     _number(events["same_type_gap_s"], "events.same_type_gap_s", 0)
 
-    for kind in ("rumble", "hiss", "transient"):
+    for kind in EVENT_TYPES:
         for key, value in events[kind].items():
             low = 1 / 192000
 
@@ -233,7 +236,7 @@ def _check_events(settings) -> None:
 
             _range(value, f"events.{kind}.{key}", low, high)
 
-        if kind != "transient" and 2 * events[kind]["fade_s"][1] > events[kind]["duration_s"][0]:
+        if kind not in SHORT_TYPES and 2 * events[kind]["fade_s"][1] > events[kind]["duration_s"][0]:
             raise ValueError(f"events.{kind}.fade_s must fit inside duration_s")
 
     if events["rumble"]["cutoff_hz"][0] <= 15:
@@ -241,6 +244,31 @@ def _check_events(settings) -> None:
 
     if events["hiss"]["cutoff_hz"][1] >= 20000:
         raise ValueError("events.hiss.cutoff_hz must be below 20000")
+
+    if events["whine"]["freq_hz"][1] >= 20000:
+        raise ValueError("events.whine.freq_hz must be below 20000")
+
+    # Each beep gets its own fades, so they have to fit inside the shortest beep.
+    if 2 * events["alarm"]["fade_s"][1] > events["alarm"]["beep_s"][0]:
+        raise ValueError("events.alarm.fade_s must fit inside beep_s")
+
+
+# Returns after checking which features the model uses. It stops with a
+# ValueError if both are off or the PANNs checkpoint isn't a path.
+def _check_pretrained(settings) -> None:
+    pretrained = settings["pretrained"]
+
+    for key in ("use_ours", "use_panns"):
+        is_switch = isinstance(pretrained[key], bool)
+
+        if not is_switch:
+            raise ValueError(f"pretrained.{key} must be true or false")
+
+    if not pretrained["use_ours"] and not pretrained["use_panns"]:
+        raise ValueError("pretrained.use_ours and pretrained.use_panns can't both be off")
+
+    if not isinstance(pretrained["checkpoint"], str) or not pretrained["checkpoint"]:
+        raise ValueError("pretrained.checkpoint must be a path")
 
 
 # Returns after checking channel filters and noise. It stops with a ValueError

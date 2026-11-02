@@ -20,9 +20,8 @@ import soundfile as sf
 
 from pipeline.event_model.comparison import run_comparison
 from pipeline.event_model.dataset import make_labeled_clip
-from pipeline.event_model.features import add_context, frame_features
 from pipeline.event_model.labels import EVENT_TYPES
-from pipeline.event_model.model import EventModel, evaluate, load_model, prepare_clip, save_model
+from pipeline.event_model.model import EventModel, clip_features, evaluate, load_model, prepare_clip, save_model
 from pipeline.event_model.settings import check_settings
 from pipeline.event_model.sources import load_split, make_split, recordings, save_split
 from pipeline.filter_id.model import load_model as load_filter_id
@@ -165,10 +164,7 @@ def detect(args) -> None:
 
     for path in args.wavs:
         audio = _read_wav(path, settings["sample_rate"])
-        features, times = frame_features(audio, settings["sample_rate"], settings["features"])
-        features = add_context(features, settings["features"]["context"])
-
-        n_frames = len(times)
+        features, n_frames = clip_features(audio, settings)
         duration_s = len(audio) / settings["sample_rate"]
         events = model.detect(features, n_frames, duration_s)
 

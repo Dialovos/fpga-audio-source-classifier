@@ -15,8 +15,9 @@ import joblib
 import numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier
 
-from pipeline.event_model.features import add_context, frame_features
-from pipeline.event_model.labels import EVENT_TYPES, events_to_frames, frames_to_events
+from pipeline.event_model.features import add_context, frame_count, frame_features
+from pipeline.event_model.labels import EVENT_TYPES, SHORT_TYPES, events_to_frames, frames_to_events
+from pipeline.event_model.pretrained import panns_features
 from pipeline.event_model.scoring import add_counts, drop_edge_detections, match_events, precision_recall
 
 # ********************************
@@ -37,17 +38,41 @@ class Clip:
     recording_id: str
 
 
+# Returns the frame features the model reads for some audio, and how many frames
+# there are. The settings' pretrained block picks the features: our own (with
+# their neighboring frames), the PANNs probabilities, or both side by side, ours
+# first. Training, detecting, and comparing all use this, so they always match.
+# It stops with a ValueError for bad audio, and a FileNotFoundError if PANNs is
+# on and its files are missing.
+def clip_features(audio, settings) -> tuple[np.ndarray, int]:
+    sample_rate = settings["sample_rate"]
+    frame_settings = settings["features"]
+    pretrained = settings["pretrained"]
+    n_frames = frame_count(len(audio), frame_settings["hop"])
+    parts = []
+
+    if pretrained["use_ours"]:
+        ours, _ = frame_features(audio, sample_rate, frame_settings)
+        parts.append(add_context(ours, frame_settings["context"]))
+
+    if pretrained["use_panns"]:
+        hop = frame_settings["hop"]
+        parts.append(panns_features(audio, sample_rate, n_frames, hop, pretrained["checkpoint"]))
+
+    if len(parts) == 1:
+        return parts[0], n_frames
+
+    return np.hstack(parts), n_frames
+
+
 # Returns a prepared Clip without keeping the audio. It stops with a ValueError
 # if the audio is empty, non-finite, or not mono.
 def prepare_clip(audio, record, settings) -> Clip:
     sample_rate = settings["sample_rate"]
-    frame_settings = settings["features"]
-    features, times = frame_features(audio, sample_rate, frame_settings)
-    features = add_context(features, frame_settings["context"])
+    features, n_frames = clip_features(audio, settings)
 
     events = record.get("events", [])
-    n_frames = len(times)
-    hop = frame_settings["hop"]
+    hop = settings["features"]["hop"]
     targets = events_to_frames(events, n_frames, sample_rate, hop, EVENT_TYPES)
 
     duration_s = len(audio) / sample_rate
@@ -57,21 +82,22 @@ def prepare_clip(audio, record, settings) -> Clip:
     return Clip(features, n_frames, targets, events, duration_s, clip_id, recording_id)
 
 
-# Returns selected training features and targets, keeping every positive
-# transient frame. It stops with a ValueError if there are no training clips.
+# Returns selected training features and targets, keeping every positive frame
+# of a short sound. It stops with a ValueError if there are no training clips.
 def _training_rows(clips, settings, classes) -> tuple[np.ndarray, np.ndarray]:
     if not clips:
         raise ValueError("fit needs train clips")
 
-    transient = None
+    short_columns = []
 
-    if "transient" in classes:
-        transient = classes.index("transient")
+    for kind in SHORT_TYPES:
+        if kind in classes:
+            short_columns.append(classes.index(kind))
 
     count = 0
 
     for clip in clips:
-        keep = _training_mask(clip, settings, transient)
+        keep = _training_mask(clip, settings, short_columns)
         count += int(np.count_nonzero(keep))
 
     # Allocate the selected rows once as float64, which the classifier needs.
@@ -81,7 +107,7 @@ def _training_rows(clips, settings, classes) -> tuple[np.ndarray, np.ndarray]:
     first = 0
 
     for clip in clips:
-        keep = _training_mask(clip, settings, transient)
+        keep = _training_mask(clip, settings, short_columns)
         end = first + int(np.count_nonzero(keep))
         features[first:end] = clip.features[keep]
         targets[first:end] = clip.targets[keep]
@@ -104,13 +130,14 @@ def _balanced_repeats(target) -> np.ndarray:
     return repeats
 
 
-# Returns the rows kept for training, including every positive transient frame.
-def _training_mask(clip, settings, transient) -> np.ndarray:
+# Returns the rows kept for training, including every positive frame of the
+# short sounds' columns.
+def _training_mask(clip, settings, short_columns) -> np.ndarray:
     keep = np.zeros(clip.n_frames, dtype=bool)
     keep[::settings["model"]["train_frame_step"]] = True
 
-    if transient is not None:
-        keep |= clip.targets[:, transient] == 1
+    for column in short_columns:
+        keep |= clip.targets[:, column] == 1
 
     return keep
 

@@ -84,10 +84,14 @@ def notebook_run(voiceovers, tmp_path_factory):
     settings["split"]["tune_fraction"] = 0.5
     settings["events"]["per_clip"] = [1, 1]
 
-    for kind in ("rumble", "hiss"):
+    # Every type has to fit inside a 0.6 s clip, so each one gets trained.
+    for kind in ("rumble", "hum", "whine", "hiss"):
         settings["events"][kind]["duration_s"] = [0.1, 0.2]
         settings["events"][kind]["fade_s"] = [0.01, 0.02]
 
+    settings["events"]["alarm"]["duration_s"] = [0.25, 0.4]
+    settings["events"]["alarm"]["beep_s"] = [0.05, 0.1]
+    settings["events"]["alarm"]["gap_s"] = [0.03, 0.05]
     settings["clips"]["conditions_per_test_clip"] = 1
     settings["clips"]["export_examples"] = 0
     settings["features"]["hop"] = 3840
@@ -474,22 +478,30 @@ def test_clip_plot_marks_hits_misses_and_false_alarms(notebook_run):
     record["events"] = [
         {"type": "rumble", "start_s": 0.1, "end_s": 0.2},
         {"type": "hiss", "start_s": 0.2, "end_s": 0.3},
-        {"type": "transient", "start_s": 0.4, "end_s": 0.401},
+        {"type": "click", "start_s": 0.4, "end_s": 0.401},
     ]
     detected = [
         {"type": "rumble", "start_s": 0.1, "end_s": 0.2},
-        {"type": "transient", "start_s": 0.52, "end_s": 0.53},
+        {"type": "click", "start_s": 0.52, "end_s": 0.53},
     ]
     figure = wt.plot_test_clip(audio, record, detected, settings)
 
+    # The spectrogram is the first axis, then one track per type in order.
+    rumble = figure.axes[1 + EVENT_TYPES.index("rumble")]
+    hiss = figure.axes[1 + EVENT_TYPES.index("hiss")]
+    click = figure.axes[1 + EVENT_TYPES.index("click")]
+    hum = figure.axes[1 + EVENT_TYPES.index("hum")]
+
     try:
+        assert len(figure.axes) == 2 + len(EVENT_TYPES)
         assert figure.axes[0].get_yscale() == "log"
         assert figure.axes[0].get_ylim() == (20, 20000)
-        assert figure.axes[1].get_title(loc="left") == "1 hits, 0 misses, 0 false alarms"
-        assert figure.axes[2].get_title(loc="left") == "0 hits, 1 misses, 0 false alarms"
-        assert figure.axes[3].get_title(loc="left") == "0 hits, 1 misses, 1 false alarms"
-        assert figure.axes[3].lines[0].get_color() == "darkorange"
-        assert figure.axes[3].lines[1].get_color() == "crimson"
+        assert rumble.get_title(loc="left") == "1 hits, 0 misses, 0 false alarms"
+        assert hiss.get_title(loc="left") == "0 hits, 1 misses, 0 false alarms"
+        assert click.get_title(loc="left") == "0 hits, 1 misses, 1 false alarms"
+        assert hum.get_title(loc="left") == "0 hits, 0 misses, 0 false alarms"
+        assert click.lines[0].get_color() == "darkorange"
+        assert click.lines[1].get_color() == "crimson"
         output = io.BytesIO()
         figure.savefig(output, format="png")
         assert output.tell() < 300000
@@ -579,7 +591,7 @@ def test_comparison_display_keeps_undefined_scores(capsys):
         assert "Precision" in output and "Recall" in output and "F1" in output
         assert "AI estimate undone" in output
         assert "n/a" in output
-        assert len(figure.axes[0].patches) == 12
+        assert len(figure.axes[0].patches) == 4 * len(EVENT_TYPES)
         assert np.isnan(figure.axes[0].patches[0].get_height())
     finally:
         plt.close(figure)
@@ -607,11 +619,11 @@ def test_detect_file_and_event_list(notebook_run, voiceovers, capsys):
     many = []
 
     for index in range(25):
-        many.append({"type": "transient", "start_s": index, "end_s": index + 0.02, "confidence": 0.5})
+        many.append({"type": "click", "start_s": index, "end_s": index + 0.02, "confidence": 0.5})
 
     wt.print_events(many)
     output = capsys.readouterr().out
-    assert "transient: 25" in output
+    assert "click: 25" in output
     assert "19.000" in output and "20.000" not in output
     assert "... and 5 more" in output
 

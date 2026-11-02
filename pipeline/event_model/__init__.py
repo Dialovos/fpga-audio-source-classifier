@@ -8,8 +8,8 @@ This file has one group:
 from __future__ import annotations
 
 from pipeline.event_model.dataset import make_clip, make_labeled_clip, make_test_cases, test_clip_count
-from pipeline.event_model.labels import EVENT_TYPES, events_to_frames, frames_to_events
-from pipeline.event_model.model import Clip, EventModel, evaluate, load_model, prepare_clip, save_model
+from pipeline.event_model.labels import EVENT_TYPES, SHORT_TYPES, events_to_frames, frames_to_events
+from pipeline.event_model.model import Clip, EventModel, clip_features, evaluate, load_model, prepare_clip, save_model
 from pipeline.event_model.settings import check_settings
 
 # ********************************
@@ -18,9 +18,11 @@ from pipeline.event_model.settings import check_settings
 
 __all__ = [
     "EVENT_TYPES",
+    "SHORT_TYPES",
     "Clip",
     "EventModel",
     "check_settings",
+    "clip_features",
     "evaluate",
     "events_to_frames",
     "frames_to_events",

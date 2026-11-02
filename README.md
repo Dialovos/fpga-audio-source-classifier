@@ -52,9 +52,19 @@ Each prediction prints as one JSON line with a `spec` (type, family, order, cuto
 
 ## Event model (second AI layer)
 
-The event model finds rumble, hiss, and transients (clicks and knocks) in the audio, and gives each one a start, an end, and a confidence.
+The event model finds 7 kinds of sounds you'd hear in a cockpit, and gives each one a start, an end, and a confidence:
 
-To train it from the command line (takes ~6 minutes):
+- Rumble: low noise below ~150 Hz
+- Hum: a steady low tone with harmonics, 50-400 Hz
+- Whine: a steady high tone, 2-12 kHz
+- Hiss: high noise from 4-8 kHz up to 20 kHz
+- Alarm: a tone at 500 Hz-3 kHz that beeps on and off
+- Thump: a short low knock
+- Click: a short broadband click
+
+It can read our own frame features, a pretrained sound model's (PANNs CNN14, below), or both. The `pretrained` block of `pipeline/event_model/settings.json` picks which.
+
+To train it from the command line:
 
 ```
 python -m pipeline.event_model train --out results/<YYYY-MM-DD>-<your-name>-<short-name>
@@ -77,6 +87,24 @@ python -m pipeline.event_model compare --model results/<run>/model.joblib --filt
 ```
 
 It writes the scores to `metrics.json`, one line per test case to `cases.jsonl`, and a few example WAVs to `examples/`. Leave out `--filter-id-model` to skip the AI guess version. The filter gets undone with our Python copy of the C inverse. On Linux, where the C program builds, add `--method c --c-command pipeline/reversable_filters/filter`.
+
+### The pretrained model (PANNs)
+
+PANNs CNN14 was trained on AudioSet (~2 million clips, 527 sound classes). We use it frozen: it gives a probability for each of its 527 classes every 10 ms, and the event model reads those next to (or instead of) our own features. It hears 50 Hz-14 kHz, so our features still cover below 50 Hz, 14-24 kHz, and the sharp timing of thumps and clicks.
+
+Before turning it on (`"use_panns": true`), get its checkpoint (~330 MB, into `data/models/`, which Git ignores) and AudioSet's label list once:
+
+```
+python -m pipeline.event_model.pretrained download
+```
+
+The normal test run checks the PANNs code with a stand-in. To check the real model, run this on its own (it needs ~1 GB of memory):
+
+```
+python -m pytest pipeline/tests/check_panns.py
+```
+
+PANNs is by Qiuqiang Kong et al., "PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition" (2020). Its code is MIT-licensed, and the checkpoint is shared on Zenodo under CC BY 4.0.
 
 ## Status
 

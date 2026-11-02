@@ -16,7 +16,7 @@ import soundfile as sf
 
 from pipeline.degrade import add_noise, quantize
 from pipeline.event_model import events
-from pipeline.event_model.labels import event_order
+from pipeline.event_model.labels import SHORT_TYPES, event_order
 from pipeline.event_model.sources import render_background
 from pipeline.filter_id.dataset import sample_filter
 from pipeline.filters import apply_filter
@@ -136,8 +136,12 @@ def _mix_events(audio, settings, rng) -> tuple[list[dict], int]:
     dropped = 0
     generators = {
         "rumble": events.rumble,
+        "hum": events.hum,
+        "whine": events.whine,
         "hiss": events.hiss,
-        "transient": events.transient,
+        "alarm": events.alarm,
+        "thump": events.thump,
+        "click": events.click,
     }
     sample_rate = settings["sample_rate"]
     background_rms = float(np.sqrt(np.mean(audio**2)))
@@ -157,7 +161,7 @@ def _mix_events(audio, settings, rng) -> tuple[list[dict], int]:
             level_key = "level_db"
             measured = np.sqrt(np.mean(sound**2))
 
-            if kind == "transient":
+            if kind in SHORT_TYPES:
                 level_key = "peak_db"
                 measured = np.max(np.abs(sound))
 

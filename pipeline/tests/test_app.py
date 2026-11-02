@@ -121,10 +121,14 @@ def model_files(tmp_path_factory):
     settings["split"]["tune_fraction"] = 0.5
     settings["events"]["per_clip"] = [1, 1]
 
-    for kind in ("rumble", "hiss"):
+    # Every type has to fit inside a 0.6 s clip, so each one gets trained.
+    for kind in ("rumble", "hum", "whine", "hiss"):
         settings["events"][kind]["duration_s"] = [0.1, 0.2]
         settings["events"][kind]["fade_s"] = [0.01, 0.02]
 
+    settings["events"]["alarm"]["duration_s"] = [0.25, 0.4]
+    settings["events"]["alarm"]["beep_s"] = [0.05, 0.1]
+    settings["events"]["alarm"]["gap_s"] = [0.03, 0.05]
     settings["clips"]["train_clips"] = 6
     settings["clips"]["tune_clips"] = 2
     settings["clips"]["conditions_per_test_clip"] = 1
