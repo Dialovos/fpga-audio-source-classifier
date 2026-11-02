@@ -272,6 +272,35 @@ def test_split_keeps_recordings_and_time_apart(development):
         make_split(development["items"], settings)
 
 
+# Tests: recordings of awkward lengths still get a split with exactly the guard
+# gap, and the split passes its own check.
+# Why: the train end and tune start are decimal numbers, and for some lengths
+# (like 4 s with a 0.1 s guard) their difference comes out a hair under the
+# guard, which used to make make_split refuse its own split.
+def test_split_guard_survives_rounding():
+    settings = default_settings()
+    settings["clip_seconds"] = 0.6
+    settings["split"]["guard_seconds"] = 0.1
+    settings["split"]["tune_fraction"] = 0.5
+
+    for seconds in (3.0, 4.0, 7.3, 12.9, 301.8):
+        items = []
+
+        for recording_id in ("a", "b"):
+            items.append({
+                "recording_id": recording_id,
+                "kind": "wav",
+                "background_path": "unused.wav",
+                "copies": [],
+                "duration_s": seconds,
+            })
+
+        split = make_split(items, settings)
+
+        for train, tune in zip(split["train"], split["tune"]):
+            assert tune["start_s"] - train["end_s"] == pytest.approx(0.1)
+
+
 # Tests: raw and noisy files form one recording, while missing or repeated group
 # files stop.
 # Why: noisy copies may be listed for audit but must never become the
