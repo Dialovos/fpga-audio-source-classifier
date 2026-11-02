@@ -21,31 +21,16 @@ This file has four groups:
 # TO DO (Vadin): this file is a blank spec. Write the app here.
 #
 # Every function the app needs is described below, in the order to write them,
-# with its exact name and arguments, what it returns, and when it stops with an
-# error. Write each def right under its description and keep the description as
-# the function's summary comment.
+# with what it's expected to do. The function names have to match, since the
+# tests call them by name, but how you write each one is up to you.
 #
 # The tests in pipeline/tests/test_app.py check every one of these. The app is
 # done when they all pass:
 #
 #     python -m pytest pipeline/tests/test_app.py
 #
-# A good order is one group at a time, rerunning the tests as you go. Until a
-# function exists, the whole test file stops at its import line, so it's fine
-# to start with every function as a stub (def ...: pass) and fill them in.
-#
-# House rules (same as the rest of pipeline/):
-#     * Simple, plain code: short functions, for loops instead of clever
-#       one-liners, clear names.
-#     * Comments like the other files: a # summary right above each function
-#       saying what it returns and when it stops, and a banner per group (the
-#       ones below). Delete these TO DO notes when you're done.
-#     * Ruff has to pass: ruff check pipeline --line-length 120. At the end,
-#       delete the ruff noqa line above the imports and run it again.
-#     * Don't change the tests. If one looks wrong, ask first.
-#
 # When everything passes, add an "Offline app" section to the README with the
-# command above, then open a PR.
+# command above, push to this branch, and the draft PR gets marked ready.
 # ============================================================================
 
 # The imports and the two constants below are already set up. Most of the work
@@ -86,33 +71,43 @@ MAX_LISTED_EVENTS = 20
 # ********************************
 
 
-# load_models(filter_id_path, event_model_path) -> dict
+# load_models
 #
-# Returns both trained models with the settings they were trained on, as a dict
-# with these keys: "filter_id", "filter_id_settings", "event_model",
-# "event_settings", and "sample_rate" (the event model's).
-#   * load_filter_id(path) and load_event_model(path) each return (model, settings).
-#   * Both model files use the same format number, so load_filter_id will happily
-#     load an event model file. Check that the filter ID model is really a
-#     FilterIdModel, and stop with a TypeError if it isn't.
-#   * load_event_model already stops with a ValueError if the file isn't an event
-#     model. Let that error through.
-#   * Stop with a ValueError that says "sample rate" if the two models were
-#     trained at different sample rates.
+# Loads the two trained models the app runs on and gives back everything the
+# later steps need in one dictionary. It takes the path of the filter ID model's
+# file first and then the path of the event model's file. Each file was saved
+# together with the settings that model was trained with, and both parts of the
+# pipeline already have a function that loads their own kind of file and gives
+# back the model and its settings.
+#
+# Both kinds of file are saved the same way, so the filter ID loader will happily
+# open an event model file by mistake. Check that what it gives back really is a
+# filter ID model, and stop with a TypeError if it isn't. The event model loader
+# already refuses a file that isn't an event model, so let its error through.
+# The two models also have to agree on the sample rate, or they'd read the same
+# audio differently; if they don't, stop with a ValueError whose message mentions
+# the sample rate.
+#
+# The dictionary holds the filter ID model, its settings, the event model, its
+# settings, and the sample rate both expect, under the keys "filter_id",
+# "filter_id_settings", "event_model", "event_settings", and "sample_rate".
 
 
-# check_files(paths, sample_rate, min_seconds) -> None
+# check_files
 #
-# Returns nothing if every file is OK. Stops with a ValueError that names the
-# file (put the path in the message) if a file:
-#   * can't be read as a WAV file. sf.info(path) raises sf.LibsndfileError or
-#     OSError for those; catch them and raise the ValueError instead.
-#   * isn't mono (info.channels),
-#   * isn't at the models' sample rate (info.samplerate),
-#   * is shorter than min_seconds (info.frames compared with min_seconds x sample_rate),
-#   * has the same file name (Path(path).stem) as an earlier file in the list,
-#     since their outputs would write over each other.
-# Use sf.info, not sf.read, so the check doesn't load whole recordings.
+# Makes sure every recording can be analyzed before the app touches any of them,
+# so one bad file stops the run before anything gets written. It takes the list
+# of WAV file paths, the sample rate the models expect, and the shortest length a
+# file can be, in seconds (the filter ID model needs at least one clip of the
+# length it was trained on). It gives back nothing when every file is fine.
+#
+# It looks at each file's details without loading the audio, and stops with a
+# ValueError at the first file that can't be read as a WAV file at all, has more
+# than one channel, is at a different sample rate, or is shorter than the
+# minimum. Two files with the same name are a problem too, even in different
+# folders, since their outputs would be saved under the same names and write over
+# each other. Every message has to name the file, so people know which one to
+# fix.
 
 
 # ********************************
@@ -120,41 +115,50 @@ MAX_LISTED_EVENTS = 20
 # ********************************
 
 
-# identify_filter(audio, models) -> dict
+# identify_filter
 #
-# Returns the filter ID model's guess for the whole recording, as {"spec",
-# "confidence"}. Make the features exactly like training did:
-# spectrum_features(audio, sample_rate, **filter_id_settings["features"]), then
-# take models["filter_id"].predict(features)[0].
+# Asks the filter ID model what filter was applied to a whole recording. It takes
+# the recording's audio (a 1-D array of samples) and the loaded models, and gives
+# back the model's answer for that recording: a dictionary with the filter spec
+# (its type, family, order, and cutoff, in the form the filter and compensation
+# code accepts) and how confident the model is. The model can only answer for
+# features made exactly the way its training features were, so make the spectrum
+# features from the audio with the feature settings saved with the filter ID
+# model.
 
 
-# find_events(audio, models) -> list[dict]
+# find_events
 #
-# Returns the events the event model finds in the audio, each a dict with
-# "type", "start_s", "end_s", and "confidence". Use the event model's settings
-# (models["event_settings"]):
-#   1. features, times = frame_features(audio, sample_rate, settings["features"])
-#   2. features = add_context(features, settings["features"]["context"])
-#   3. return models["event_model"].detect(features, len(times), len(audio) / sample_rate)
-# This is the same thing `python -m pipeline.event_model detect` does, and the
-# test checks you get the same events.
+# Runs the event model over a recording and gives back every event it finds, as
+# a list of dictionaries with each event's type, start and end time in seconds,
+# and confidence. It takes the audio and the loaded models. It has to make the
+# frame features exactly the way the event model's own detect command does, from
+# the settings saved with the event model, because the test compares its events
+# with what python -m pipeline.event_model detect finds in the same file. Reading
+# how detect does it in pipeline/event_model/__main__.py is the quickest way in.
 
 
-# analyze_file(path, models, method="python", command=None) -> tuple[dict, np.ndarray]
+# analyze_file
 #
-# Runs the three steps on one checked WAV file and returns (report, compensated).
-#   1. Read the file: sf.read(path, dtype="float64").
-#   2. guess = identify_filter(audio, models)
-#   3. compensated, compensation = compensate(audio, sample_rate, guess["spec"],
-#      method=method, command=command). method is "python" (our copy of the C
-#      inverse) or "c" (Adam's C program, which needs command, a list like
-#      ["pipeline/reversable_filters/filter"]). compensate stops with a ValueError
-#      if the C program fails; let that through.
-#   4. events = find_events(compensated, models). The events come from the
-#      compensated audio, not the original.
-# The report is a dict with: "file" (just the file name, like "clip.wav"),
-# "sample_rate", "duration_s", "filter" (the guess), "compensation" (the record
-# compensate returned), and "events".
+# Does the app's whole job for one recording that already passed check_files. It
+# takes the file's path, the loaded models, which inverse undoes the filter, and
+# the command that runs the C program. The inverse is "python" by default (our
+# Python copy of Adam's inverse) or "c" (Adam's C program itself), and the
+# command is only needed for "c": a list like
+# ["pipeline/reversable_filters/filter"].
+#
+# It reads the audio, asks identify_filter for the filter, and undoes that guessed
+# filter with the compensation code, which handles both inverses and gives back
+# the undone audio plus a record of how it was undone. Then it runs find_events on
+# the undone audio, not the original, since finding the buried events after
+# undoing the filter is the point of the project. If the C program fails, the
+# compensation code stops with a ValueError; let it through.
+#
+# It gives back two things: the report, and the undone (compensated) audio so it
+# can be saved next. The report is a dictionary with the file's name (just the
+# name, not its folder), the sample rate, the length in seconds, the filter guess,
+# the compensation record, and the events, under the keys "file",
+# "sample_rate", "duration_s", "filter", "compensation", and "events".
 
 
 # ********************************
@@ -162,49 +166,62 @@ MAX_LISTED_EVENTS = 20
 # ********************************
 
 
-# write_outputs(out, report, compensated) -> tuple[Path, Path]
+# write_outputs
 #
-# Writes two files to the folder out (make it if it doesn't exist), named after
-# the input file's stem, and returns their paths as (wav_path, report_path):
-#   * <stem>-compensated.wav: the compensated audio as a 32-bit float WAV
-#     (sf.write(..., subtype="FLOAT")), so nothing past full scale gets clipped.
-#   * <stem>-report.json: json.dumps(to_jsonable(report), indent=2). to_jsonable
-#     turns numpy numbers into plain ones so json can save them.
-
-
-# describe_filter(spec) -> str
+# Saves the results for one recording and gives back where it saved them. It
+# takes the output folder (make it if it doesn't exist yet), the report, and the
+# compensated audio, and writes two files named after the input file (the
+# report's file name without its extension): <name>-compensated.wav and
+# <name>-report.json.
 #
-# Returns a filter spec in words, with the cutoffs rounded to whole Hz:
-#     "band-pass, order 4, 250 Hz to 6000 Hz"
-#     "high-pass, order 2, 312 Hz"
-#     "low-pass, order 1, 8000 Hz"
-# Use FILTER_NAMES for the type. A band-pass's cutoff is a [low, high] list.
+# The audio has to be saved as a 32-bit float WAV at the report's sample rate.
+# Undoing a filter can push the audio past full scale, and any other format would
+# clip it, which would hide what the inverse really did. The report gets saved as
+# readable JSON; numpy numbers can't go into JSON directly, and pipeline.records
+# has a helper that turns them into plain ones. It gives back the two paths, the
+# audio's first.
 
 
-# count_events(events, types) -> str
+# describe_filter
 #
-# Returns how many events of each type are in the list, for every type in
-# types, in that order, including 0s:
-#     "rumble 1, hiss 0, transient 2"
-# types comes from the event model (models["event_model"].classes), not a
-# hard-coded list, since the event model is going from 3 types to 7.
+# Turns a filter spec into words for the summary: the type the way people say it
+# (FILTER_NAMES above has those), the order, and the cutoff rounded to whole Hz,
+# or both edges for a band-pass, whose cutoff is a [low, high] pair. For example
+# "band-pass, order 4, 250 Hz to 6000 Hz", "high-pass, order 2, 312 Hz", or
+# "low-pass, order 1, 8000 Hz".
 
 
-# summary(report, types) -> str
+# count_events
 #
-# Returns a short summary of one report for the terminal, one fact per line:
+# Says how many events of each type are in a list of events, as one line of text
+# like "rumble 1, hiss 0, transient 2". It takes the events and the types to
+# count, in the order to show them, and lists every type, including the ones with
+# none. The types come from the event model itself (its classes) instead of being
+# written into the app, since the event model is going from 3 types to 7.
+
+
+# summary
+#
+# Turns one report into a short block of text for the terminal. It takes the
+# report and the event model's list of types. It's the first thing people read
+# after a run, so it shows one fact per line: the file name and its length in
+# seconds (one decimal), the filter guess in words with the model's confidence in
+# the type and the order (two decimals each), which inverse undid it, and how many
+# events were found in total and of each type.
+#
+# Then it lists each event with its type, start and end times (two decimals), and
+# confidence, but only when there are MAX_LISTED_EVENTS or fewer. With more than
+# that it skips the list and adds a line saying every event is in the report, so
+# a long recording doesn't flood the terminal. A layout like this works, though
+# the test only checks the facts, not the spacing:
+#
 #     cockpit.wav (42.0 s)
 #       Filter: band-pass, order 4, 250 Hz to 6000 Hz
 #         confidence: type 0.90, order 0.60
 #       Undone with: the python inverse
 #       Events: 3 (rumble 1, hiss 0, transient 2)
 #         rumble        0.50 s to     1.75 s, confidence 0.80
-#         transient     2.00 s to     2.01 s, confidence 0.60
 #         ...
-# List each event (type, start, end, confidence) only if there are
-# MAX_LISTED_EVENTS or fewer. Otherwise skip the list and add a line saying
-# every event is in the report. The test checks the facts, not the exact
-# spacing, so this layout is a suggestion.
 
 
 # ********************************
@@ -212,31 +229,23 @@ MAX_LISTED_EVENTS = 20
 # ********************************
 
 
-# _build_parser() -> argparse.ArgumentParser
+# main
 #
-# Returns the parser for the app's options:
-#     --filter-id-model   required, a filter ID model.joblib
-#     --event-model       required, an event model.joblib
-#     --method            "python" or "c", default "python"
-#     --c-command         the C filter program, needed with --method c
-#     --out               required, the folder for the reports and WAVs
-#     wavs                one or more WAV files (nargs="+")
-
-
-# main(argv=None) -> None
+# Runs the whole app from the command line. It takes the list of command-line
+# words (or reads the real command line when it's given nothing), with these
+# options: --filter-id-model and --event-model for the two model files, --out for
+# the folder the outputs go in, --method for the inverse (python or c, python by
+# default), --c-command for the path to Adam's C program (only needed with c),
+# and then one or more WAV files. Setting up the options with argparse in a small
+# helper function keeps main short.
 #
-# Runs the app:
-#   1. Read the command line with _build_parser().parse_args(argv).
-#   2. If --method is c and there's no --c-command, stop with
-#      sys.exit("...") and a message that mentions --c-command.
-#   3. Load the models and check every file before analyzing any of them. The
-#      min_seconds for check_files is the filter ID model's clip length,
-#      models["filter_id_settings"]["clip_seconds"]. If either step raises a
-#      ValueError or TypeError, stop with sys.exit(f"error: {error}") so people
-#      get a message instead of a traceback.
-#   4. For each file: analyze_file, write_outputs, then print the summary and
-#      where the two files were saved.
+# It first stops with a message if --method c came without --c-command. Then it
+# loads the models and checks every file before analyzing any of them; the
+# shortest file allowed is the clip length saved in the filter ID model's
+# settings. If loading or checking fails, it stops with a short error message
+# instead of a traceback (sys.exit with the message as text does that). Then, for
+# each file in turn, it analyzes it, writes its outputs, and prints its summary
+# and where the two files went.
 #
-# At the very bottom of the file, add the usual:
-#     if __name__ == "__main__":
-#         main()
+# At the very bottom of the file, the usual if __name__ == "__main__" line calls
+# main, so python -m pipeline.app works.
