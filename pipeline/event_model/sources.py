@@ -254,8 +254,12 @@ def _check_split(split, recordings, settings) -> None:
         for tune in split["tune"]:
             if train["recording_id"] == tune["recording_id"]:
                 gap = max(tune["start_s"] - train["end_s"], train["start_s"] - tune["end_s"])
+                gap_samples = round(gap * settings["sample_rate"])
+                guard_samples = round(settings["split"]["guard_seconds"] * settings["sample_rate"])
 
-                if gap < settings["split"]["guard_seconds"]:
+                # Compare whole samples, like the stretch length above, so rounding
+                # in the times can't make an exact guard gap look too short.
+                if gap_samples < guard_samples:
                     raise ValueError("split train and tune must keep guard_seconds apart")
 
 
