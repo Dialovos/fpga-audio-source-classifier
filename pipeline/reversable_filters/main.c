@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int main(int argc, char *argv[]) {
   int choice = 0;
@@ -104,7 +105,7 @@ int main(int argc, char *argv[]) {
         apply_bilinear_lowpass(AI_inFile, AI_outFile, AI_fc_lp, AI_order);
         printf("applied lowpass\r\n");
       } else if (choice == 2) {
-        apply_bilinear_highpass(AI_inFile, AI_outFile, AI_fc_lp, AI_order);
+        apply_bilinear_highpass(AI_inFile, AI_outFile, AI_fc_hp, AI_order);
         printf("applied highpass\r\n");
       } else if (choice == 3) {
         apply_bilinear_highpass(AI_inFile, "int.wav", AI_fc_hp, AI_order);
@@ -122,7 +123,7 @@ int main(int argc, char *argv[]) {
         
       }
       printf("Automated task finished\r\n");
-      return 1;
+      return 0;
     } else if (mode == 1 && strcmp(AI_family, "butter") != 0){
       printf("invalid filter family\r\n");
       return -1;
