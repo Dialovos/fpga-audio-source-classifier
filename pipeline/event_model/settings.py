@@ -1,8 +1,9 @@
 """
 Check the settings for the event model before making audio.
 
-This file has two groups:
+This file has three groups:
     * Small setting checks
+    * Optional clip settings
     * Checking a run
 """
 
@@ -67,6 +68,33 @@ def _range(value, name, low=-np.inf, high=np.inf, whole=False) -> None:
 
     if value[0] > value[1]:
         raise ValueError(f"{name} must go from low to high")
+
+
+# ********************************
+# Optional clip settings
+# ********************************
+
+# Clip settings added after the first runs were saved. A settings file can
+# leave any of them out and get the value the code used before, so a saved run
+# still loads and still matches its settings.json. They stay out of the default
+# settings.json for the same reason: check_settings requires every key in it.
+#   speech_rms             the RMS level the speech is scaled to before events go in
+#   train_level_db         [low, high]: each train and tune clip is moved by a random
+#                          number of dB in this range, speech and events together
+#   train_filtered_chance  how often a train or tune clip is filtered like a test case
+#   train_undone_chance    how often it is filtered and then undone with the true filter
+OPTIONAL_CLIP_SETTINGS = {
+    "speech_rms": 0.1,
+    "train_level_db": [0, 0],
+    "train_filtered_chance": 0,
+    "train_undone_chance": 0,
+}
+
+
+# Returns one optional clip setting, or the value the code used before when
+# the settings leave it out.
+def clip_setting(settings, key):
+    return settings["clips"].get(key, OPTIONAL_CLIP_SETTINGS[key])
 
 
 # ********************************
@@ -173,6 +201,17 @@ def _check_sources_split(settings) -> None:
         _number(settings["clips"][key], f"clips.{key}", minimum, whole=True)
 
     _number(settings["clips"]["train_noise_chance"], "clips.train_noise_chance", 0, 1)
+
+    # The optional clip settings are checked whether or not the file names them.
+    _number(clip_setting(settings, "speech_rms"), "clips.speech_rms", 1e-6, 1)
+    _range(clip_setting(settings, "train_level_db"), "clips.train_level_db", -60, 20)
+    filtered = clip_setting(settings, "train_filtered_chance")
+    undone = clip_setting(settings, "train_undone_chance")
+    _number(filtered, "clips.train_filtered_chance", 0, 1)
+    _number(undone, "clips.train_undone_chance", 0, 1)
+
+    if filtered + undone > 1:
+        raise ValueError("clips.train_filtered_chance and clips.train_undone_chance must not add up to more than 1")
 
 
 # Returns after checking frame sizes, bands, and tree settings. It stops with a

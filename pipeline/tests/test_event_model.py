@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
+from pipeline.compensation import compensate
 from pipeline.degrade import add_noise, quantize
 from pipeline.event_model import events
 from pipeline.event_model.__main__ import main
@@ -198,6 +199,10 @@ def test_settings_reject_bad_values():
         ("pretrained.use_ours", False),
         ("pretrained.use_panns", 1),
         ("pretrained.checkpoint", ""),
+        ("clips.speech_rms", 0),
+        ("clips.train_level_db", [0, -10]),
+        ("clips.train_filtered_chance", 1.5),
+        ("clips.train_undone_chance", -0.1),
     ]
 
     for path, value in cases:
@@ -640,6 +645,124 @@ def test_training_noise_continues_the_clip_stream(tmp_path):
     assert record["clip"] == clean_record["clip"]
     assert record["damage"][0] == noise_record
     assert record["damage"][1] == rounding
+
+
+# Tests: leaving the optional clip settings out makes the same clip and record
+# as writing them out with their earlier values, and two chances that add up
+# to more than 1 stop with their names.
+# Why: runs saved before these settings existed have to keep loading and keep
+# matching their settings.json.
+def test_optional_clip_settings_keep_the_old_clip(development):
+    items = development["items"]
+    split = development["split"]
+    settings = development["settings"]
+    written = copy.deepcopy(settings)
+    written["clips"]["speech_rms"] = 0.1
+    written["clips"]["train_level_db"] = [0, 0]
+    written["clips"]["train_filtered_chance"] = 0
+    written["clips"]["train_undone_chance"] = 0
+    check_settings(written)
+
+    audio, record = make_labeled_clip("train", 0, items, split, settings)
+    same, same_record = make_labeled_clip("train", 0, items, split, written)
+
+    np.testing.assert_array_equal(audio, same)
+
+    assert record == same_record
+
+    written["clips"]["train_filtered_chance"] = 0.6
+    written["clips"]["train_undone_chance"] = 0.6
+
+    with pytest.raises(ValueError, match="train_undone_chance"):
+        check_settings(written)
+
+
+# Tests: speech_rms sets the level the speech is scaled to, and train_level_db
+# moves a whole training clip by the drawn number of dB before it is rounded.
+# Why: the team picks the speech level so 16-bit audio doesn't clip, and a
+# model trained at one level changes its answers on a quieter recording.
+def test_speech_level_and_training_level_settings(development):
+    items = development["items"]
+    split = development["split"]
+    settings = copy.deepcopy(development["settings"])
+    settings["events"]["per_clip"] = [0, 0]
+    settings["clips"]["train_noise_chance"] = 0
+
+    quiet = copy.deepcopy(settings)
+    quiet["clips"]["speech_rms"] = 0.025
+    usual, _ = make_clip("train", 0, items, split, settings)
+    quarter, _ = make_clip("train", 0, items, split, quiet)
+
+    assert np.sqrt(np.mean(usual**2)) == pytest.approx(0.1)
+    assert np.sqrt(np.mean(quarter**2)) == pytest.approx(0.025)
+    np.testing.assert_allclose(quarter, usual / 4)
+
+    moved = copy.deepcopy(settings)
+    moved["clips"]["train_level_db"] = [-20, -20]
+    expected, _ = quantize(usual * 10 ** (-20 / 20), stage="after_filter")
+    actual, record = make_labeled_clip("train", 0, items, split, moved)
+
+    np.testing.assert_array_equal(actual, expected)
+
+    assert record["clip"]["level_db"] == -20
+
+
+# Tests: with train_filtered_chance 1 a training clip is the clean clip put
+# through the filter in its record and rounded once. With train_undone_chance
+# 1 it is that same clip with the filter undone. With both at one half, both
+# versions and both noise stages show up.
+# Why: the extra comparison trains on filtered and undone audio, so those
+# clips have to be made the way the test cases are and say so in their records.
+def test_filtered_and_undone_training_clips(development):
+    items = development["items"]
+    split = development["split"]
+    settings = copy.deepcopy(development["settings"])
+    settings["clips"]["train_noise_chance"] = 0
+    clean, clean_record = make_clip("train", 0, items, split, settings)
+
+    filtered_settings = copy.deepcopy(settings)
+    filtered_settings["clips"]["train_filtered_chance"] = 1
+    filtered, record = make_labeled_clip("train", 0, items, split, filtered_settings)
+    spec = {}
+
+    for key in ("type", "family", "order", "cutoff"):
+        spec[key] = record["filter"][key]
+
+    expected, _ = apply_filter(clean, FS, spec)
+    expected, rounding = quantize(expected, stage="after_filter")
+
+    np.testing.assert_array_equal(filtered, expected)
+
+    assert record["clip"]["version"] == "filtered"
+    assert record["events"] == clean_record["events"]
+    assert record["damage"] == [rounding]
+    assert "compensation" not in record
+
+    undone_settings = copy.deepcopy(settings)
+    undone_settings["clips"]["train_undone_chance"] = 1
+    undone, undone_record = make_labeled_clip("train", 0, items, split, undone_settings)
+    recovered, _ = compensate(expected, FS, spec)
+
+    np.testing.assert_array_equal(undone, recovered)
+
+    assert undone_record["clip"]["version"] == "undone"
+    assert undone_record["filter"] == record["filter"]
+    assert undone_record["compensation"]["method"] == "python"
+
+    mixed = copy.deepcopy(settings)
+    mixed["clips"]["train_filtered_chance"] = 0.5
+    mixed["clips"]["train_undone_chance"] = 0.5
+    mixed["clips"]["train_noise_chance"] = 1
+    versions = set()
+    stages = set()
+
+    for index in range(12):
+        _, mixed_record = make_labeled_clip("train", index, items, split, mixed)
+        versions.add(mixed_record["clip"]["version"])
+        stages.add(mixed_record["damage"][0]["stage"])
+
+    assert versions == {"filtered", "undone"}
+    assert stages == {"before_filter", "after_filter"}
 
 
 # ********************************
