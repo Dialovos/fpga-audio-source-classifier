@@ -88,6 +88,15 @@ void apply_bilinear_lowpass(const char *input_filename,
     fclose(infile);
     return;
 }
+  if (memcmp(header.chunkId, "RIFF", 4) || memcmp(header.format, "WAVE", 4) ||
+      memcmp(header.subchunk1Id, "fmt ", 4) || header.subchunk1Size != 16 ||
+      header.audioFormat != 1 || header.numChannels != 1 ||
+      header.sampleRate != 48000 || header.bitsPerSample != 16 ||
+      header.blockAlign != 2 || header.byteRate != 96000) {
+    fprintf(stderr, "Expected 48 kHz mono 16-bit PCM WAV.\n");
+    fclose(infile);
+    return;
+  }
   fseek(infile, 12, SEEK_SET);
 
   char chunk_id[4];
@@ -214,7 +223,7 @@ void apply_bilinear_lowpass(const char *input_filename,
   }
 
   // Process 32-bit samples
-  size_t samples_to_read = chunk_size / sizeof(float);
+  size_t samples_to_read = chunk_size / sizeof(int16_t);
   
   printf("Calculated samples: %zu\n", samples_to_read);
 
@@ -225,11 +234,11 @@ void apply_bilinear_lowpass(const char *input_filename,
   double x1_prev1 = 0.0, y1_prev1 = 0.0;
   double x1_prev2 = 0.0, y1_prev2 = 0.0;
 
-  float sample_in;
+  int16_t sample_in;
 
   for (size_t i = 0; i < samples_to_read; i++) {
 
-    if (fread(&sample_in, sizeof(float), 1, infile) != 1)
+    if (fread(&sample_in, sizeof(sample_in), 1, infile) != 1)
       break;
 
     double x = (double)sample_in;
@@ -258,9 +267,12 @@ void apply_bilinear_lowpass(const char *input_filename,
         y2 = y1;
     }
 
-    float sample_out = (float)y2;
+    // Saturate before narrowing to signed 16-bit PCM.
+    if (y2 > 32767.0) y2 = 32767.0;
+    if (y2 < -32768.0) y2 = -32768.0;
+    int16_t sample_out = (int16_t)y2;
 
-    fwrite(&sample_out, sizeof(float), 1, outfile);
+    fwrite(&sample_out, sizeof(sample_out), 1, outfile);
   }
 
   fclose(infile);
@@ -283,6 +295,15 @@ void apply_bilinear_highpass(const char *input_filename,
     fclose(infile);
     return;
 }
+  if (memcmp(header.chunkId, "RIFF", 4) || memcmp(header.format, "WAVE", 4) ||
+      memcmp(header.subchunk1Id, "fmt ", 4) || header.subchunk1Size != 16 ||
+      header.audioFormat != 1 || header.numChannels != 1 ||
+      header.sampleRate != 48000 || header.bitsPerSample != 16 ||
+      header.blockAlign != 2 || header.byteRate != 96000) {
+    fprintf(stderr, "Expected 48 kHz mono 16-bit PCM WAV.\n");
+    fclose(infile);
+    return;
+  }
   fseek(infile, 12, SEEK_SET);
 
   char chunk_id[4];
@@ -388,7 +409,7 @@ void apply_bilinear_highpass(const char *input_filename,
   }
 
   // Process 32-bit samples
-  size_t samples_to_read = chunk_size / sizeof(float);
+  size_t samples_to_read = chunk_size / sizeof(int16_t);
 
   double x_prev1 = 0.0, y_prev1 = 0.0;
   double x_prev2 = 0.0, y_prev2 = 0.0;
@@ -396,11 +417,11 @@ void apply_bilinear_highpass(const char *input_filename,
   double x1_prev1 = 0.0, y1_prev1 = 0.0;
   double x1_prev2 = 0.0, y1_prev2 = 0.0;
 
-  float sample_in;
+  int16_t sample_in;
 
   for (size_t i = 0; i < samples_to_read; i++) {
 
-    if (fread(&sample_in, sizeof(float), 1, infile) != 1)
+    if (fread(&sample_in, sizeof(sample_in), 1, infile) != 1)
       break;
 
     double x = (double)sample_in;
@@ -431,9 +452,11 @@ void apply_bilinear_highpass(const char *input_filename,
         y2 = y1;
     }
 
-    float sample_out = (float)y2;
+    if (y2 > 32767.0) y2 = 32767.0;
+    if (y2 < -32768.0) y2 = -32768.0;
+    int16_t sample_out = (int16_t)y2;
 
-    fwrite(&sample_out, sizeof(float), 1, outfile);
+    fwrite(&sample_out, sizeof(sample_out), 1, outfile);
   }
 
   fclose(infile);
@@ -456,6 +479,15 @@ void reverse_bilinear_lowpass(const char *input_filename,
     fclose(infile);
     return;
 }
+  if (memcmp(header.chunkId, "RIFF", 4) || memcmp(header.format, "WAVE", 4) ||
+      memcmp(header.subchunk1Id, "fmt ", 4) || header.subchunk1Size != 16 ||
+      header.audioFormat != 1 || header.numChannels != 1 ||
+      header.sampleRate != 48000 || header.bitsPerSample != 16 ||
+      header.blockAlign != 2 || header.byteRate != 96000) {
+    fprintf(stderr, "Expected 48 kHz mono 16-bit PCM WAV.\n");
+    fclose(infile);
+    return;
+  }
   fseek(infile, 12, SEEK_SET);
 
   char chunk_id[4];
@@ -566,7 +598,7 @@ FILE *outfile = fopen(output_filename, "wb");
   }
 
   // Process 32-bit samples
-  size_t samples_to_read = chunk_size / sizeof(float);
+  size_t samples_to_read = chunk_size / sizeof(int16_t);
 
   size_t N = 65536;
 
@@ -588,11 +620,11 @@ FILE *outfile = fopen(output_filename, "wb");
   // Read the entire WAV into memory
 for (size_t i = 0; i < samples_to_read; i++) {
 
-    float sample;
+    int16_t sample;
 
-    if (fread(&sample, sizeof(float), 1, infile) == 1) {
+    if (fread(&sample, sizeof(sample), 1, infile) == 1) {
 
-        audio[i] = (double)sample;
+        audio[i] = (double)sample / 32768.0;
 
     } else {
 
@@ -664,9 +696,13 @@ for (size_t i = 0; i < samples_to_read; i++) {
 
       double reconstructed = in[i + guard] / N;
 
-      float sample_out = (float)reconstructed;
+      // FFT input is normalized; convert back to signed 16-bit PCM.
+      reconstructed *= 32768.0;
+      if (reconstructed > 32767.0) reconstructed = 32767.0;
+      if (reconstructed < -32768.0) reconstructed = -32768.0;
+      int16_t sample_out = (int16_t)reconstructed;
 
-      fwrite(&sample_out, sizeof(float), 1, outfile);
+      fwrite(&sample_out, sizeof(sample_out), 1, outfile);
     }
   }
 
@@ -700,6 +736,15 @@ void reverse_bilinear_highpass(const char *input_filename,
     fclose(infile);
     return;
 }
+  if (memcmp(header.chunkId, "RIFF", 4) || memcmp(header.format, "WAVE", 4) ||
+      memcmp(header.subchunk1Id, "fmt ", 4) || header.subchunk1Size != 16 ||
+      header.audioFormat != 1 || header.numChannels != 1 ||
+      header.sampleRate != 48000 || header.bitsPerSample != 16 ||
+      header.blockAlign != 2 || header.byteRate != 96000) {
+    fprintf(stderr, "Expected 48 kHz mono 16-bit PCM WAV.\n");
+    fclose(infile);
+    return;
+  }
   fseek(infile, 12, SEEK_SET);
 
   char chunk_id[4];
@@ -808,7 +853,7 @@ void reverse_bilinear_highpass(const char *input_filename,
 
 
   // Process 32-bit samples
-  size_t samples_to_read = chunk_size / sizeof(float);
+  size_t samples_to_read = chunk_size / sizeof(int16_t);
 
   size_t N = 65536;
 
@@ -830,11 +875,11 @@ void reverse_bilinear_highpass(const char *input_filename,
   // Read the entire WAV into memory
   for (size_t i = 0; i < samples_to_read; i++) {
 
-    float sample;
+    int16_t sample;
 
-    if (fread(&sample, sizeof(float), 1, infile) == 1) {
+    if (fread(&sample, sizeof(sample), 1, infile) == 1) {
 
-        audio[i] = (double)sample;
+        audio[i] = (double)sample / 32768.0;
 
     } else {
 
@@ -907,9 +952,12 @@ void reverse_bilinear_highpass(const char *input_filename,
 
       double reconstructed = in[i + guard] / N;
 
-      float sample_out = (float)reconstructed;
+      reconstructed *= 32768.0;
+      if (reconstructed > 32767.0) reconstructed = 32767.0;
+      if (reconstructed < -32768.0) reconstructed = -32768.0;
+      int16_t sample_out = (int16_t)reconstructed;
 
-      fwrite(&sample_out, sizeof(float), 1, outfile);
+      fwrite(&sample_out, sizeof(sample_out), 1, outfile);
     }
   }
 
@@ -941,6 +989,15 @@ void reverse_bilinear_bandpass(const char *input_filename,
     fclose(infile);
     return;
 }
+  if (memcmp(header.chunkId, "RIFF", 4) || memcmp(header.format, "WAVE", 4) ||
+      memcmp(header.subchunk1Id, "fmt ", 4) || header.subchunk1Size != 16 ||
+      header.audioFormat != 1 || header.numChannels != 1 ||
+      header.sampleRate != 48000 || header.bitsPerSample != 16 ||
+      header.blockAlign != 2 || header.byteRate != 96000) {
+    fprintf(stderr, "Expected 48 kHz mono 16-bit PCM WAV.\n");
+    fclose(infile);
+    return;
+  }
   fseek(infile, 12, SEEK_SET);
 
   char chunk_id[4];
@@ -1103,7 +1160,7 @@ void reverse_bilinear_bandpass(const char *input_filename,
 
 
   // Process 32-bit samples
-  size_t samples_to_read = chunk_size / sizeof(float);
+  size_t samples_to_read = chunk_size / sizeof(int16_t);
 
   size_t N = 65536;
 
@@ -1125,11 +1182,11 @@ void reverse_bilinear_bandpass(const char *input_filename,
   // Read the entire WAV into memory
   for (size_t i = 0; i < samples_to_read; i++) {
 
-    float sample;
+    int16_t sample;
 
-    if (fread(&sample, sizeof(float), 1, infile) == 1) {
+    if (fread(&sample, sizeof(sample), 1, infile) == 1) {
 
-        audio[i] = (double)sample;
+        audio[i] = (double)sample / 32768.0;
 
     } else {
 
@@ -1212,9 +1269,12 @@ void reverse_bilinear_bandpass(const char *input_filename,
 
       double reconstructed = in[i + guard] / N;
 
-      float sample_out = (float)reconstructed;
+      reconstructed *= 32768.0;
+      if (reconstructed > 32767.0) reconstructed = 32767.0;
+      if (reconstructed < -32768.0) reconstructed = -32768.0;
+      int16_t sample_out = (int16_t)reconstructed;
 
-      fwrite(&sample_out, sizeof(float), 1, outfile);
+      fwrite(&sample_out, sizeof(sample_out), 1, outfile);
     }
   }
 
