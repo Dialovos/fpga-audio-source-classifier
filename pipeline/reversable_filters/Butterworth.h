@@ -1,5 +1,5 @@
 #ifndef BUTTERWORTH
-#define BUTTERWORTH
+#define BUTTERWORTH_H
 #include <stdio.h>
 #include <stdint.h>
 
@@ -26,6 +26,8 @@ void apply_bilinear_lowpass(const char* input_filename, const char* output_filen
 void apply_bilinear_highpass(const char* input_filename, const char* output_filename, double cutoff_freq_hz, int order);
 
 void reverse_bilinear_lowpass(const char* input_filename, const char* output_filename, double cutoff_freq_hz, int order);
+
+void reverse_bilinear_highpass(const char* input_filename, const char* output_filename, double cutoff_freq_hz, int order);
 
 void reverse_bilinear_bandpass(const char *input_filename, const char *output_filename,
 double hp_cutoff_freq_hz, double lp_cutoff_freq_hz, int order);
