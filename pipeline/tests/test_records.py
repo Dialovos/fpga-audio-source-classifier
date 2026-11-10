@@ -16,7 +16,7 @@ def sample_record(**overrides):
     fields = {
         "example_id": "ex-000001",
         "seed": 123,
-        "sample_rate": 192_000,
+        "sample_rate": 48_000,
         "sources": [{"recording_id": "rec-03", "role": "event", "level_db": -6.0}],
         "filter_record": {"type": "highpass", "family": "butter", "order": 4, "cutoff": 250.0},
         "damage": [
@@ -35,7 +35,7 @@ def sample_record(**overrides):
 #   generating anything.
 def test_settings_load_and_need_a_seed(tmp_path):
     good = tmp_path / "good.json"
-    good.write_text(json.dumps({"seed": 42, "sample_rate": 192000}), encoding="utf-8")
+    good.write_text(json.dumps({"seed": 42, "sample_rate": 48000}), encoding="utf-8")
     assert load_settings(good)["seed"] == 42
 
     for bad_seed in (None, -1, 1.5, True, "42"):
@@ -64,7 +64,7 @@ def test_example_seeds_repeat_and_differ_by_index():
 # Why: numpy integers make json.dumps crash, and that kind of crash tends to show up halfway through a long
 #   generation run. A fixed set of fields means every record can be read the same way later.
 def test_record_has_every_field_in_plain_python():
-    record = sample_record(seed=np.int64(123), sample_rate=np.float64(192_000))
+    record = sample_record(seed=np.int64(123), sample_rate=np.float64(48_000))
     assert record["schema_version"] == SCHEMA_VERSION
     assert set(record) == {"schema_version", "example_id", "seed", "sample_rate", "sources", "filter", "damage"}
     assert type(record["seed"]) is int

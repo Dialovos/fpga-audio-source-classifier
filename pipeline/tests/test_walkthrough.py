@@ -41,7 +41,7 @@ from pipeline.records import load_settings
 # Shared fixtures and settings
 # ********************************
 
-FS = 192000
+FS = 48000
 ROOT = Path(__file__).parents[2]
 SETTINGS_FILE = ROOT / "pipeline-walkthrough-settings.json"
 EVENT_SETTINGS = ROOT / "pipeline" / "event_model" / "settings.json"
@@ -94,9 +94,9 @@ def notebook_run(voiceovers, tmp_path_factory):
     settings["events"]["alarm"]["gap_s"] = [0.03, 0.05]
     settings["clips"]["conditions_per_test_clip"] = 1
     settings["clips"]["export_examples"] = 0
-    settings["features"]["hop"] = 3840
-    settings["features"]["short_window"] = 1024
-    settings["features"]["long_window"] = 4096
+    settings["features"]["hop"] = 960
+    settings["features"]["short_window"] = 256
+    settings["features"]["long_window"] = 1024
     settings["features"]["short_bands"] = 4
     settings["features"]["long_bands"] = 2
     settings["features"]["context"] = 0
@@ -187,11 +187,11 @@ def test_make_sound_reads_wav_piece(tmp_path, capsys):
     with pytest.raises(FileNotFoundError, match="missing.wav"):
         wt.make_sound(cfg)
 
-    sf.write(tmp_path / "slow.wav", ramp, 48000, subtype="FLOAT")
-    cfg["sound"]["wav"] = str(tmp_path / "slow.wav")
+    sf.write(tmp_path / "wrong-rate.wav", ramp, 192000, subtype="FLOAT")
+    cfg["sound"]["wav"] = str(tmp_path / "wrong-rate.wav")
     cfg["sound"]["start_s"] = 0.0
 
-    with pytest.raises(ValueError, match="48000 Hz"):
+    with pytest.raises(ValueError, match="192000 Hz"):
         wt.make_sound(cfg)
 
 
@@ -283,9 +283,9 @@ def test_guess_filter_uses_model_features(tmp_path, monkeypatch, capsys):
     assert "highpass order 2, 300 Hz" in output
     assert "type 0.90, order 0.60" in output
 
-    settings["sample_rate"] = 48000
+    settings["sample_rate"] = 192000
 
-    with pytest.raises(ValueError, match="48000"):
+    with pytest.raises(ValueError, match="192000"):
         wt.guess_filter(damaged, cfg)
 
 
@@ -410,7 +410,7 @@ def test_missing_voiceovers_explain_where_to_put_files(tmp_path, monkeypatch):
         wt.event_model_settings(cfg)
 
     message = str(error.value)
-    assert "data/test-data-prelim/" in message
+    assert "data/test-data-prelim-48k/" in message
     assert "VO1.wav" in message
     assert "VO3_noise.wav" in message
     assert str(tmp_path) not in message
@@ -536,7 +536,7 @@ def test_comparison_with_filter_id(notebook_run, monkeypatch, capsys):
     folder = notebook_run["folder"]
     filter_id_path = folder / "filter-id.joblib"
     filter_id_path.touch()
-    features = {"n_bands": 96, "f_min_hz": 20, "f_max_hz": 24000, "segment": 32768}
+    features = {"n_bands": 96, "f_min_hz": 20, "f_max_hz": 24000, "segment": 8192}
     filter_settings = {"sample_rate": FS, "features": features}
     spec = {"type": "highpass", "family": "butter", "order": 1, "cutoff": 100}
     filter_model = SimpleNamespace(predict=lambda rows: [{"spec": spec}])
@@ -630,7 +630,7 @@ def test_detect_file_and_event_list(notebook_run, voiceovers, capsys):
 
 # Tests: stereo and wrong-rate WAVs retain the command's clear rejection.
 # Why: the notebook must not silently resample or mix a teammate's recording.
-@pytest.mark.parametrize("channels, rate, message", [(2, FS, "mono"), (1, 48000, "sample rate")])
+@pytest.mark.parametrize("channels, rate, message", [(2, FS, "mono"), (1, 192000, "sample rate")])
 def test_detect_file_rejects_bad_wavs(notebook_run, tmp_path, channels, rate, message):
     audio = np.ones((1000, channels))
 

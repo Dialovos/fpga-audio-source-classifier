@@ -38,11 +38,11 @@ python -m pytest pipeline/tests/check_c_filter.py
 
 The easiest way to try everything is `pipeline-walkthrough.ipynb` in the repo root. It takes one sound through the whole pipeline: it filters it, adds noise, has the filter ID model guess the filter, and undoes the filter with the real settings and with the guess. It saves every version as a WAV so you can listen to it in a DAW. Then it trains or loads the event model on the team's voiceovers, plots a test clip, runs the four-version comparison, finds the events in a WAV, and runs the tests.
 
-Open it in VS Code or Jupyter with the `.venv` kernel. Change `pipeline-walkthrough-settings.json` to try a different sound, filter, noise level, or model, then rerun the cells. The notebook's first cell lists what each setting does. The voiceovers go in `data/test-data-prelim/`.
+Open it in VS Code or Jupyter with the `.venv` kernel. Change `pipeline-walkthrough-settings.json` to try a different sound, filter, noise level, or model, then rerun the cells. The notebook's first cell lists what each setting does. The voiceovers go in `data/test-data-prelim-48k/`, as mono 48 kHz WAVs.
 
 ## Filter ID model (first AI layer)
 
-Predict the filter on mono WAV files at the model's sample rate (192 kHz):
+Predict the filter on mono WAV files at the model's sample rate (48 kHz):
 
 ```
 python -m pipeline.filter_id predict --model model.joblib clip.wav
@@ -70,9 +70,9 @@ To train it from the command line:
 python -m pipeline.event_model train --out results/<YYYY-MM-DD>-<your-name>-<short-name>
 ```
 
-It trains on the recordings in `sources.source_dir` of `pipeline/event_model/settings.json`, which is the team's voiceovers in `data/test-data-prelim/` by default, with each noisy copy grouped under its raw file. To use other recordings, point it at a folder of mono 192 kHz WAV files and list any noisy copies in `recording_groups`.
+It trains on the recordings in `sources.source_dir` of `pipeline/event_model/settings.json`, which is the clean speech of the undamaged speakers in `data/adam-good/clean/` by default. The older voiceovers in `data/test-data-prelim/` are 192 kHz and no longer load; `pipeline-walkthrough-settings.json` points at 48 kHz copies of them in `data/test-data-prelim-48k/`. To use other recordings, point it at a folder of mono 48 kHz WAV files and list any noisy copies in `recording_groups`.
 
-To find the events in mono 192 kHz WAV files:
+To find the events in mono 48 kHz WAV files:
 
 ```
 python -m pipeline.event_model detect --model results/<run>/model.joblib clip.wav

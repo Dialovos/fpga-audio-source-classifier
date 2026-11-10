@@ -55,7 +55,7 @@ from pipeline.filters import apply_filter
 # Shared fixture and settings
 # ********************************
 
-FS = 192000
+FS = 48000
 SETTINGS_PATH = Path(__file__).parents[1] / "event_model" / "settings.json"
 
 
@@ -182,7 +182,7 @@ def test_settings_require_every_field():
 # Why: malformed values must not turn into obscure errors halfway through a run.
 def test_settings_reject_bad_values():
     cases = [
-        ("sample_rate", 48000),
+        ("sample_rate", 192000),
         ("seed", True),
         ("clip_seconds", 0),
         ("bits", 16),
@@ -377,7 +377,7 @@ def test_recordings_reject_bad_wavs(tmp_path):
 
     cases = [
         ("stereo", np.ones((FS // 10, 2)), FS),
-        ("rate", np.ones(FS // 10), 48000),
+        ("rate", np.ones(FS // 10), 192000),
         ("short", np.ones(10), FS),
     ]
 
@@ -650,10 +650,10 @@ def test_training_noise_continues_the_clip_stream(tmp_path):
 # Tests: frame counts round up and frame centers stay at k times the hop.
 # Why: labels and detection times must use the exact same frame positions.
 def test_frame_counts_and_times():
-    assert frame_count(1, 1920) == 1
-    assert frame_count(1920, 1920) == 1
-    assert frame_count(1921, 1920) == 2
-    np.testing.assert_array_equal(frame_times(4, FS, 1920), [0, 0.01, 0.02, 0.03])
+    assert frame_count(1, 480) == 1
+    assert frame_count(480, 480) == 1
+    assert frame_count(481, 480) == 2
+    np.testing.assert_array_equal(frame_times(4, FS, 480), [0, 0.01, 0.02, 0.03])
 
 
 # Tests: feature shape, dtype, finite values, the 60-Hz long band and onset flux
@@ -704,8 +704,8 @@ def test_band_levels_separate_shape_from_volume():
 # attack, and these measurements must not need quiet clip edges.
 def test_band_averages_and_previous_changes():
     bands = np.arange(60, dtype=np.float64).reshape(30, 2)
-    averages = band_averages(bands, FS, 1920)
-    changes = band_changes(bands, FS, 1920)
+    averages = band_averages(bands, FS, 480)
+    changes = band_changes(bands, FS, 480)
 
     np.testing.assert_allclose(averages[0], np.mean(bands[:11], axis=0))
     np.testing.assert_allclose(averages[15], np.mean(bands[5:26], axis=0))
@@ -713,7 +713,7 @@ def test_band_averages_and_previous_changes():
     np.testing.assert_array_equal(changes[0], [0, 0])
 
     shifted = bands + np.array([30, -20])
-    np.testing.assert_allclose(band_changes(shifted, FS, 1920), changes)
+    np.testing.assert_allclose(band_changes(shifted, FS, 480), changes)
 
 
 # Tests: spreads use the 25 frames on each side, a steady band has none, and a
@@ -724,7 +724,7 @@ def test_band_spreads_tell_beeping_from_steady():
     frames = np.arange(80)
     beeping = np.where((frames // 15) % 2 == 0, 0.0, -30.0)
     bands = np.column_stack([np.full(80, -10.0), beeping])
-    spreads = band_spreads(bands, FS, 1920)
+    spreads = band_spreads(bands, FS, 480)
 
     np.testing.assert_allclose(spreads[40], np.std(bands[15:66], axis=0))
     np.testing.assert_allclose(spreads[0], np.std(bands[:26], axis=0))
@@ -770,7 +770,7 @@ def test_frame_targets_use_half_open_times_and_nearest_short_sound():
         {"type": "click", "start_s": 0.045, "end_s": 0.047},
         {"type": "thump", "start_s": 0.065, "end_s": 0.067},
     ]
-    targets = events_to_frames(labeled, 10, FS, 1920, EVENT_TYPES)
+    targets = events_to_frames(labeled, 10, FS, 480, EVENT_TYPES)
 
     assert targets.dtype == np.uint8
     np.testing.assert_array_equal(np.flatnonzero(targets[:, EVENT_TYPES.index("hiss")]), [1, 2])
@@ -786,7 +786,7 @@ def test_decoding_smoothing_gaps_clipping_and_minimums():
     decoding = {"hiss": {"smooth_frames": 1, "merge_gap_s": 0.05, "min_duration_s": 0}}
     values = np.zeros((20, 1))
     values[[0, 6, 13, 19], 0] = 1
-    found = frames_to_events(values, 20, FS, 1920, 0.191, ("hiss",), {"hiss": 0.5}, decoding)
+    found = frames_to_events(values, 20, FS, 480, 0.191, ("hiss",), {"hiss": 0.5}, decoding)
 
     assert len(found) == 2
     assert found[0]["start_s"] == 0
@@ -797,7 +797,7 @@ def test_decoding_smoothing_gaps_clipping_and_minimums():
     decoding["hiss"]["smooth_frames"] = 3
     probabilities = np.array([[1.0], [0], [0]])
     smoothed = frames_to_events(
-        probabilities, 3, FS, 1920, 0.025, ("hiss",), {"hiss": 0.5}, decoding
+        probabilities, 3, FS, 480, 0.025, ("hiss",), {"hiss": 0.5}, decoding
     )
 
     assert len(smoothed) == 1
@@ -807,7 +807,7 @@ def test_decoding_smoothing_gaps_clipping_and_minimums():
     decoding["hiss"]["smooth_frames"] = 1
     decoding["hiss"]["min_duration_s"] = 0.01
 
-    assert frames_to_events(np.ones((1, 1)), 1, FS, 1920, 0.003, ("hiss",), {"hiss": 0.5}, decoding) == []
+    assert frames_to_events(np.ones((1, 1)), 1, FS, 480, 0.003, ("hiss",), {"hiss": 0.5}, decoding) == []
 
 
 # Tests: generated labels survive targets-to-events decoding under the exact
@@ -820,11 +820,11 @@ def test_labels_round_trip_through_frames(development):
 
     for index in range(5):
         audio, record = make_clip("test", index, development["items"], development["split"], settings)
-        count = frame_count(len(audio), 1920)
-        targets = events_to_frames(record["events"], count, FS, 1920, EVENT_TYPES)
+        count = frame_count(len(audio), 480)
+        targets = events_to_frames(record["events"], count, FS, 480, EVENT_TYPES)
         probabilities = targets.astype(float)
         detected = frames_to_events(
-            probabilities, count, FS, 1920, 3, EVENT_TYPES, thresholds, settings["decoding"]
+            probabilities, count, FS, 480, 3, EVENT_TYPES, thresholds, settings["decoding"]
         )
         counts = match_events(detected, record["events"], settings["scoring"])
 
@@ -983,7 +983,7 @@ def test_detect_command_json_and_bad_wavs(development, tmp_path, capsys):
     assert result["file"] == str(path)
     assert isinstance(result["events"], list)
 
-    for samples, rate, message in ((np.column_stack([audio, audio]), FS, "mono"), (audio, 48000, "sample rate")):
+    for samples, rate, message in ((np.column_stack([audio, audio]), FS, "mono"), (audio, 192000, "sample rate")):
         sf.write(path, samples, rate, subtype="FLOAT")
 
         with pytest.raises(SystemExit, match=message):
@@ -1010,7 +1010,7 @@ def small_filter_id(source_dir):
             "bandpass_high_hz": [2000, 16000],
         },
         "noise": {"snr_db": [20, 40], "stages": ["before_filter", "after_filter"]},
-        "features": {"n_bands": 96, "f_min_hz": 20, "f_max_hz": 24000, "segment": 32768},
+        "features": {"n_bands": 96, "f_min_hz": 20, "f_max_hz": 24000, "segment": 8192},
     }
     data = build_dataset(settings)
     model = FilterIdModel(7).fit(data.features, data.labels)

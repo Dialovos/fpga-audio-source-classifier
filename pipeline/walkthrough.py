@@ -316,7 +316,7 @@ def plot_spectra(versions, cfg):
     figure, axis = plt.subplots(figsize=(9, 3.5), dpi=90, layout="constrained")
 
     for name, audio in versions.items():
-        segment = min(32768, len(audio))
+        segment = min(8192, len(audio))
         freqs, power = signal.welch(audio, fs=sample_rate, nperseg=segment)
         decibels = 10 * np.log10(np.maximum(power[1:], 1e-20))
         axis.semilogx(freqs[1:], decibels, label=VERSION_NAMES[name], linewidth=1)
@@ -465,7 +465,7 @@ def plot_test_clip(audio, record, detected, settings):
         gridspec_kw={"height_ratios": [3] + [1] * tracks}, layout="constrained",
     )
     frequencies, times, power = signal.spectrogram(
-        audio, fs=settings["sample_rate"], nperseg=16384, noverlap=8192,
+        audio, fs=settings["sample_rate"], nperseg=4096, noverlap=2048,
     )
     useful = (frequencies >= 20) & (frequencies <= 20000)
     decibels = 10 * np.log10(np.maximum(power[useful], 1e-14))

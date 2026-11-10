@@ -27,7 +27,7 @@ from pipeline.event_model.model import EventModel, clip_features, load_model, pr
 # Stand-in model
 # ********************************
 
-FS = 192000
+FS = 48000
 SETTINGS_PATH = Path(__file__).parents[1] / "event_model" / "settings.json"
 
 
@@ -69,7 +69,7 @@ def stand_in(monkeypatch):
 # ********************************
 
 
-# Tests: 192 kHz audio comes out at 32 kHz with one sixth of the samples, and a
+# Tests: 48 kHz audio comes out at 32 kHz with two thirds of the samples, and a
 # 1 kHz tone stays at 1 kHz.
 # Why: CNN14 was trained at 32 kHz, so audio at any other rate would sound
 # wrong to it.
@@ -80,7 +80,7 @@ def test_to_32k_keeps_length_and_pitch():
     spectrum = np.abs(np.fft.rfft(resampled))
     peak_hz = np.argmax(spectrum) * pretrained.PANNS_RATE / len(resampled)
 
-    assert len(resampled) == FS // 6
+    assert len(resampled) == FS * 2 // 3
     assert peak_hz == pytest.approx(1000, abs=1)
 
 
@@ -91,8 +91,8 @@ def test_to_32k_keeps_length_and_pitch():
 def test_line_up_matches_frame_times_and_repeats_the_end():
     rows = np.arange(5)[:, None] * np.ones((1, 3))
 
-    same_step = pretrained.line_up(rows, 8, 1920, FS)
-    double_step = pretrained.line_up(rows, 4, 3840, FS)
+    same_step = pretrained.line_up(rows, 8, 480, FS)
+    double_step = pretrained.line_up(rows, 4, 960, FS)
 
     assert same_step.shape == (8, 3)
     assert list(same_step[:, 0]) == [0, 1, 2, 3, 4, 4, 4, 4]
@@ -105,7 +105,7 @@ def test_line_up_matches_frame_times_and_repeats_the_end():
 # its trees would read the wrong numbers.
 def test_clip_features_switches_and_column_order(stand_in):
     audio = np.random.default_rng(7).standard_normal(FS // 2)
-    n_frames = frame_count(len(audio), 1920)
+    n_frames = frame_count(len(audio), 480)
 
     ours, ours_frames = clip_features(audio, settings_with(True, False))
     panns, panns_frames = clip_features(audio, settings_with(False, True))

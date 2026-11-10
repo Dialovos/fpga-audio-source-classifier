@@ -3,7 +3,7 @@ The offline app: find the filter on a recording, undo it, and find the events.
 
     python -m pipeline.app --filter-id-model FILE --event-model FILE --out DIR clip.wav [more.wav ...]
 
-For each mono 192 kHz WAV file, the app does three steps in order. The filter ID
+For each mono 48 kHz WAV file, the app does three steps in order. The filter ID
 model guesses the filter, the compensation filter undoes that guess, and the
 event model finds the events in the undone (compensated) audio. Then the app
 writes a report and the compensated WAV to --out, and prints a short summary of

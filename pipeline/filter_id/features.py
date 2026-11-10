@@ -101,7 +101,7 @@ def spectrum_features(
     n_bands: int = 96,
     f_min_hz: float = 20.0,
     f_max_hz: float = 24_000.0,
-    segment: int = 32_768,
+    segment: int = 8_192,
 ) -> np.ndarray:
     samples = np.asarray(audio, dtype=np.float64)
     _check_inputs(samples, sample_rate, f_min_hz, f_max_hz)

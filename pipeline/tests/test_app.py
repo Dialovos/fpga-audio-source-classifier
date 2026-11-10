@@ -55,7 +55,7 @@ from pipeline.records import load_settings, to_jsonable
 # Shared fixtures
 # ********************************
 
-FS = 192000
+FS = 48000
 EVENT_SETTINGS = Path(__file__).parents[1] / "event_model" / "settings.json"
 BANDPASS = {"type": "bandpass", "family": "butter", "order": 4, "cutoff": [250, 6000]}
 THREE_TYPES = ("rumble", "hiss", "transient")
@@ -104,7 +104,7 @@ def model_files(tmp_path_factory):
             "bandpass_high_hz": [2000, 16000],
         },
         "noise": {"snr_db": [20, 40], "stages": ["before_filter", "after_filter"]},
-        "features": {"n_bands": 96, "f_min_hz": 20, "f_max_hz": 24000, "segment": 32768},
+        "features": {"n_bands": 96, "f_min_hz": 20, "f_max_hz": 24000, "segment": 8192},
     }
     data = build_dataset(filter_id_settings)
     filter_id = FilterIdModel(7).fit(data.features, data.labels)
@@ -133,9 +133,9 @@ def model_files(tmp_path_factory):
     settings["clips"]["tune_clips"] = 2
     settings["clips"]["conditions_per_test_clip"] = 1
     settings["clips"]["export_examples"] = 0
-    settings["features"]["hop"] = 3840
-    settings["features"]["short_window"] = 1024
-    settings["features"]["long_window"] = 4096
+    settings["features"]["hop"] = 960
+    settings["features"]["short_window"] = 256
+    settings["features"]["long_window"] = 1024
     settings["features"]["short_bands"] = 4
     settings["features"]["long_bands"] = 2
     settings["features"]["context"] = 0
@@ -227,7 +227,7 @@ def test_load_models_returns_both_models(models):
     assert isinstance(models["filter_id"], FilterIdModel)
     assert isinstance(models["event_model"], EventModel)
     assert models["filter_id_settings"]["features"]["n_bands"] == 96
-    assert models["event_settings"]["features"]["hop"] == 3840
+    assert models["event_settings"]["features"]["hop"] == 960
     assert models["sample_rate"] == FS
 
 
@@ -244,8 +244,8 @@ def test_load_models_refuses_the_wrong_files(model_files, models, tmp_path):
         load_models(model_files["filter_id"], model_files["filter_id"])
 
     settings = dict(models["filter_id_settings"])
-    settings["sample_rate"] = 48000
-    other_rate = tmp_path / "filter-id-48k.joblib"
+    settings["sample_rate"] = 192000
+    other_rate = tmp_path / "filter-id-192k.joblib"
     save_filter_id(other_rate, models["filter_id"], settings)
 
     with pytest.raises(ValueError, match="sample rate"):
@@ -271,7 +271,7 @@ def test_check_files_names_the_bad_file(clips, tmp_path):
     sf.write(stereo, np.zeros((FS, 2)), FS, subtype="FLOAT")
 
     slow = tmp_path / "slow.wav"
-    sf.write(slow, np.zeros(48000), 48000, subtype="FLOAT")
+    sf.write(slow, np.zeros(192000), 192000, subtype="FLOAT")
 
     short = tmp_path / "short.wav"
     sf.write(short, np.zeros(FS // 2), FS, subtype="FLOAT")

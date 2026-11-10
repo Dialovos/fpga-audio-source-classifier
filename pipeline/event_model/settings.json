@@ -1,16 +1,12 @@
 {
   "seed": 4240,
-  "sample_rate": 192000,
+  "sample_rate": 48000,
   "clip_seconds": 10.0,
   "edge_margin_s": 0.25,
   "bits": 24,
   "sources": {
-    "source_dir": "data/test-data-prelim",
-    "recording_groups": {
-      "VO1": {"background": "VO1.wav", "copies": ["VO1_noise.wav"]},
-      "VO2": {"background": "VO2.wav", "copies": ["VO2_noise.wav"]},
-      "VO3": {"background": "VO3.wav", "copies": ["VO3_noise.wav"]}
-    }
+    "source_dir": "data/adam-good/clean",
+    "recording_groups": {}
   },
   "split": {
     "test_recordings": 1,
@@ -205,9 +201,9 @@
     }
   },
   "features": {
-    "hop": 1920,
-    "short_window": 4096,
-    "long_window": 16384,
+    "hop": 480,
+    "short_window": 1024,
+    "long_window": 4096,
     "short_bands": 32,
     "short_min_hz": 200,
     "short_max_hz": 24000,

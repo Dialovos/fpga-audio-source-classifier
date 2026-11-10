@@ -2,7 +2,7 @@
 Checks for the simple test sounds.
 
 The proposal's real data is 10-20 source recordings, with synthetic tones allowed as a supplement.
-These sounds stand in until we have the recordings. Everything runs at 192 kHz, the proposal's sample rate.
+These sounds stand in until we have the recordings. Everything runs at 48 kHz, the project's sample rate.
 """
 
 import numpy as np
@@ -10,7 +10,7 @@ import pytest
 
 from pipeline.signals import thump, tone, white_noise
 
-FS = 192_000
+FS = 48_000
 
 
 # Returns the frequency in Hz where the audio's spectrum is strongest.
@@ -59,7 +59,7 @@ def test_noise_hits_the_rms_and_repeats_with_the_same_seed():
     assert abs(np.mean(a)) < 0.01
 
 
-# Tests: the sound functions refuse a tone at Nyquist (96 kHz at 192 kHz), a zero-length clip, an amplitude
+# Tests: the sound functions refuse a tone at Nyquist (24 kHz at 48 kHz), a zero-length clip, an amplitude
 #   over 1, a thump onset past the end of the clip, zero decay, and a zero noise level.
 # Why: each of these would give silence, an empty clip, a divide by zero, or audio that clips,
 #   while the record still says the sound is there. That's a wrong label we wouldn't notice.

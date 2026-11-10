@@ -1,7 +1,7 @@
 """
 Checks that the filters we apply are the filters we asked for.
 
-Everything runs at 192 kHz, the proposal's sample rate. The proposal uses Butterworth
+Everything runs at 48 kHz, the project's sample rate. The proposal uses Butterworth
 high-pass, low-pass, and band-pass filters at orders 1, 2, and 4, so those are the main cases.
 """
 
@@ -13,10 +13,10 @@ from scipy import signal
 
 from pipeline.filters import apply_filter, design_filter, normalize_spec, response_db
 
-FS = 192_000
+FS = 48_000
 
 
-# Returns a sine wave at freq_hz with a peak of 1, seconds long, at 192 kHz.
+# Returns a sine wave at freq_hz with a peak of 1, seconds long, at 48 kHz.
 def tone(freq_hz: float, seconds: float = 3.0) -> np.ndarray:
     t = np.arange(int(seconds * FS)) / FS
     return np.sin(2 * np.pi * freq_hz * t)
@@ -207,7 +207,7 @@ def test_record_is_json_and_rebuilds_the_same_filter(spec):
 
 
 # Tests: design_filter refuses settings that don't make sense: an odd band-pass order, reversed cutoffs,
-#   a cutoff at Nyquist (96 kHz at 192 kHz), order 0, a float order, an unknown type or family, and a typo'd key.
+#   a cutoff at Nyquist (24 kHz at 48 kHz), order 0, a float order, an unknown type or family, and a typo'd key.
 # Why: a bad setting that gets quietly fixed or ignored makes a label that doesn't match the audio, and a wrong
 #   label is hard to spot once it's in the dataset. We'd rather the generator stop than save a wrong example.
 #   The odd band-pass case follows our total-pole rule, so it changes if the team picks the DAW way of counting.

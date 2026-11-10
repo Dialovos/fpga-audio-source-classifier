@@ -23,7 +23,7 @@ import soundfile as sf
 from scipy import signal
 
 C_FOLDER = Path(__file__).parents[1] / "reversable_filters"
-FS = 192_000
+FS = 48_000
 
 # The same settings the C program uses to undo a filter: the regularization (lambda), the FFT size, and how many
 # samples get thrown away at each end of every block.
@@ -46,12 +46,12 @@ ORDERS = [1, 2, 4]
 # which round at about 6e-8 of the peak, so this leaves plenty of room for that and nothing for a wrong filter.
 TOLERANCE = 1e-5
 
-# For the round trip (filter, then undo, then compare with the original). The signal is 0.25 s, so it fits in one
+# For the round trip (filter, then undo, then compare with the original). The signal is 1 s, so it fits in one
 # block and has no joins. The first and last ROUND_TRIP_EDGE samples don't count, because the inverse filter needs
 # more samples around each one than the file has at its ends. The signal only has frequencies where the filter's
 # gain squared is at least PASSBAND_GAIN. There the regularization costs under 0.2% of the signal, so
 # ROUND_TRIP_TOLERANCE (1% of the peak) leaves room for that and nothing for a wrong filter.
-ROUND_TRIP_SAMPLES = FS // 4
+ROUND_TRIP_SAMPLES = FS
 ROUND_TRIP_EDGE = 8192
 PASSBAND_GAIN = 0.5
 ROUND_TRIP_TOLERANCE = 1e-2
@@ -79,12 +79,12 @@ def program(tmp_path_factory):
     return folder / "filter"
 
 
-# Returns 1 s of white noise at an RMS of 0.1, already rounded to 32-bit floats. The C program reads 32-bit floats,
-# so rounding first means the C program and Python start from exactly the same samples. 1 s covers four of the
+# Returns 4 s of white noise at an RMS of 0.1, already rounded to 32-bit floats. The C program reads 32-bit floats,
+# so rounding first means the C program and Python start from exactly the same samples. 4 s covers four of the
 # undo blocks, so the joins between blocks get checked too.
 def noise():
     rng = np.random.default_rng(4240)
-    audio = 0.1 * rng.standard_normal(FS)
+    audio = 0.1 * rng.standard_normal(4 * FS)
     return audio.astype(np.float32).astype(np.float64)
 
 
@@ -282,10 +282,10 @@ def test_undo_brings_back_the_signal(program, tmp_path):
 #   test_undo_matches_python can't show a problem here, since the Python copy uses the same blocks. Undoing in one
 #   piece has no joins to get wrong.
 #   Right now this fails for the high-pass and band-pass undo (the low-pass undo is fine). Their inverse filter lasts
-#   longer than the guard, so each block comes out wrong near its ends, worst at the joins: 0.6% to 1.4% of the peak
-#   at the readme's cutoffs, and up to 24% at the lower ones. The Python copy has the same errors with the same
-#   guard, and they go away in it when the guard is much larger (32768, with blocks of 262144), so the guard is the
-#   cause. This should pass once the C program's guard is large enough.
+#   longer than the guard, so each block comes out wrong near its ends, worst at the joins. In the Python copy, which
+#   uses the same blocks, that's 0.3% of the peak at the readme's cutoffs (first order only; orders 2 and 4 are fine
+#   there) and 0.6% to 3.2% at the lower ones. They drop to 0.002% in it when the guard is much larger (32768, with
+#   blocks of 131072), so the guard is the cause. This should pass once the C program's guard is large enough.
 def test_undo_matches_one_piece(program, tmp_path):
     audio = noise()
     problems = []

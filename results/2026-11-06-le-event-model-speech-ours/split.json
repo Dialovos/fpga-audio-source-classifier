@@ -1,0 +1,542 @@
+{
+  "version": 1,
+  "test": [
+    "Speaker3",
+    "Speaker15",
+    "Speaker17",
+    "Speaker23",
+    "Speaker25",
+    "Speaker31",
+    "Speaker32",
+    "Speaker34",
+    "Speaker45",
+    "Speaker52",
+    "Speaker55",
+    "Speaker58",
+    "Speaker65"
+  ],
+  "train": [
+    {
+      "recording_id": "Speaker10",
+      "start_s": 0,
+      "end_s": 908.877609375
+    },
+    {
+      "recording_id": "Speaker11",
+      "start_s": 0,
+      "end_s": 1001.614765625
+    },
+    {
+      "recording_id": "Speaker12",
+      "start_s": 0,
+      "end_s": 1024.23778125
+    },
+    {
+      "recording_id": "Speaker13",
+      "start_s": 0,
+      "end_s": 1299.85559375
+    },
+    {
+      "recording_id": "Speaker14",
+      "start_s": 0,
+      "end_s": 1150.712765625
+    },
+    {
+      "recording_id": "Speaker16",
+      "start_s": 0,
+      "end_s": 911.5979375
+    },
+    {
+      "recording_id": "Speaker18",
+      "start_s": 0,
+      "end_s": 1160.948453125
+    },
+    {
+      "recording_id": "Speaker19",
+      "start_s": 0,
+      "end_s": 1088.5854375
+    },
+    {
+      "recording_id": "Speaker20",
+      "start_s": 0,
+      "end_s": 1007.8298593750001
+    },
+    {
+      "recording_id": "Speaker21",
+      "start_s": 0,
+      "end_s": 1235.285203125
+    },
+    {
+      "recording_id": "Speaker22",
+      "start_s": 0,
+      "end_s": 1037.2384843749999
+    },
+    {
+      "recording_id": "Speaker24",
+      "start_s": 0,
+      "end_s": 1004.909984375
+    },
+    {
+      "recording_id": "Speaker26",
+      "start_s": 0,
+      "end_s": 1338.195078125
+    },
+    {
+      "recording_id": "Speaker27",
+      "start_s": 0,
+      "end_s": 904.0760625
+    },
+    {
+      "recording_id": "Speaker28",
+      "start_s": 0,
+      "end_s": 925.09321875
+    },
+    {
+      "recording_id": "Speaker29",
+      "start_s": 0,
+      "end_s": 1022.7209375
+    },
+    {
+      "recording_id": "Speaker30",
+      "start_s": 0,
+      "end_s": 1308.7348281250001
+    },
+    {
+      "recording_id": "Speaker33",
+      "start_s": 0,
+      "end_s": 1280.4092968749999
+    },
+    {
+      "recording_id": "Speaker35",
+      "start_s": 0,
+      "end_s": 1073.938421875
+    },
+    {
+      "recording_id": "Speaker36",
+      "start_s": 0,
+      "end_s": 1066.380640625
+    },
+    {
+      "recording_id": "Speaker37",
+      "start_s": 0,
+      "end_s": 1107.14959375
+    },
+    {
+      "recording_id": "Speaker38",
+      "start_s": 0,
+      "end_s": 1345.103734375
+    },
+    {
+      "recording_id": "Speaker39",
+      "start_s": 0,
+      "end_s": 1171.406140625
+    },
+    {
+      "recording_id": "Speaker4",
+      "start_s": 0,
+      "end_s": 1130.9899375
+    },
+    {
+      "recording_id": "Speaker40",
+      "start_s": 0,
+      "end_s": 941.28025
+    },
+    {
+      "recording_id": "Speaker41",
+      "start_s": 0,
+      "end_s": 920.021765625
+    },
+    {
+      "recording_id": "Speaker42",
+      "start_s": 0,
+      "end_s": 1320.3781875
+    },
+    {
+      "recording_id": "Speaker43",
+      "start_s": 0,
+      "end_s": 1021.8788749999999
+    },
+    {
+      "recording_id": "Speaker44",
+      "start_s": 0,
+      "end_s": 1115.86596875
+    },
+    {
+      "recording_id": "Speaker46",
+      "start_s": 0,
+      "end_s": 1016.144125
+    },
+    {
+      "recording_id": "Speaker47",
+      "start_s": 0,
+      "end_s": 1009.87709375
+    },
+    {
+      "recording_id": "Speaker48",
+      "start_s": 0,
+      "end_s": 1268.3495
+    },
+    {
+      "recording_id": "Speaker49",
+      "start_s": 0,
+      "end_s": 1019.48875
+    },
+    {
+      "recording_id": "Speaker5",
+      "start_s": 0,
+      "end_s": 904.7365625
+    },
+    {
+      "recording_id": "Speaker50",
+      "start_s": 0,
+      "end_s": 1277.343375
+    },
+    {
+      "recording_id": "Speaker51",
+      "start_s": 0,
+      "end_s": 1134.665421875
+    },
+    {
+      "recording_id": "Speaker53",
+      "start_s": 0,
+      "end_s": 1082.5998125
+    },
+    {
+      "recording_id": "Speaker54",
+      "start_s": 0,
+      "end_s": 1210.08096875
+    },
+    {
+      "recording_id": "Speaker56",
+      "start_s": 0,
+      "end_s": 1038.04246875
+    },
+    {
+      "recording_id": "Speaker57",
+      "start_s": 0,
+      "end_s": 1099.52365625
+    },
+    {
+      "recording_id": "Speaker59",
+      "start_s": 0,
+      "end_s": 865.9300000000001
+    },
+    {
+      "recording_id": "Speaker6",
+      "start_s": 0,
+      "end_s": 1147.173140625
+    },
+    {
+      "recording_id": "Speaker60",
+      "start_s": 0,
+      "end_s": 1135.18259375
+    },
+    {
+      "recording_id": "Speaker61",
+      "start_s": 0,
+      "end_s": 1089.9433125
+    },
+    {
+      "recording_id": "Speaker62",
+      "start_s": 0,
+      "end_s": 1082.48228125
+    },
+    {
+      "recording_id": "Speaker63",
+      "start_s": 0,
+      "end_s": 962.12434375
+    },
+    {
+      "recording_id": "Speaker69",
+      "start_s": 0,
+      "end_s": 1041.33359375
+    },
+    {
+      "recording_id": "Speaker7",
+      "start_s": 0,
+      "end_s": 895.26515625
+    },
+    {
+      "recording_id": "Speaker72",
+      "start_s": 0,
+      "end_s": 961.8386875
+    },
+    {
+      "recording_id": "Speaker8",
+      "start_s": 0,
+      "end_s": 938.6158437500001
+    },
+    {
+      "recording_id": "Speaker84",
+      "start_s": 0,
+      "end_s": 426.03134374999996
+    },
+    {
+      "recording_id": "Speaker9",
+      "start_s": 0,
+      "end_s": 1010.2133281249999
+    }
+  ],
+  "tune": [
+    {
+      "recording_id": "Speaker10",
+      "start_s": 918.877609375,
+      "end_s": 1218.5034791666667
+    },
+    {
+      "recording_id": "Speaker11",
+      "start_s": 1011.614765625,
+      "end_s": 1342.1530208333334
+    },
+    {
+      "recording_id": "Speaker12",
+      "start_s": 1034.23778125,
+      "end_s": 1372.3170416666667
+    },
+    {
+      "recording_id": "Speaker13",
+      "start_s": 1309.85559375,
+      "end_s": 1739.8074583333334
+    },
+    {
+      "recording_id": "Speaker14",
+      "start_s": 1160.712765625,
+      "end_s": 1540.9503541666666
+    },
+    {
+      "recording_id": "Speaker16",
+      "start_s": 921.5979375,
+      "end_s": 1222.1305833333333
+    },
+    {
+      "recording_id": "Speaker18",
+      "start_s": 1170.948453125,
+      "end_s": 1554.5979375
+    },
+    {
+      "recording_id": "Speaker19",
+      "start_s": 1098.5854375,
+      "end_s": 1458.1139166666667
+    },
+    {
+      "recording_id": "Speaker20",
+      "start_s": 1017.8298593750001,
+      "end_s": 1350.4398125
+    },
+    {
+      "recording_id": "Speaker21",
+      "start_s": 1245.285203125,
+      "end_s": 1653.7136041666668
+    },
+    {
+      "recording_id": "Speaker22",
+      "start_s": 1047.2384843749999,
+      "end_s": 1389.6513125
+    },
+    {
+      "recording_id": "Speaker24",
+      "start_s": 1014.909984375,
+      "end_s": 1346.5466458333333
+    },
+    {
+      "recording_id": "Speaker26",
+      "start_s": 1348.195078125,
+      "end_s": 1790.9267708333334
+    },
+    {
+      "recording_id": "Speaker27",
+      "start_s": 914.0760625,
+      "end_s": 1212.1014166666666
+    },
+    {
+      "recording_id": "Speaker28",
+      "start_s": 935.09321875,
+      "end_s": 1240.1242916666667
+    },
+    {
+      "recording_id": "Speaker29",
+      "start_s": 1032.7209375,
+      "end_s": 1370.2945833333333
+    },
+    {
+      "recording_id": "Speaker30",
+      "start_s": 1318.7348281250001,
+      "end_s": 1751.6464375
+    },
+    {
+      "recording_id": "Speaker33",
+      "start_s": 1290.4092968749999,
+      "end_s": 1713.8790625
+    },
+    {
+      "recording_id": "Speaker35",
+      "start_s": 1083.938421875,
+      "end_s": 1438.5845625
+    },
+    {
+      "recording_id": "Speaker36",
+      "start_s": 1076.380640625,
+      "end_s": 1428.5075208333333
+    },
+    {
+      "recording_id": "Speaker37",
+      "start_s": 1117.14959375,
+      "end_s": 1482.866125
+    },
+    {
+      "recording_id": "Speaker38",
+      "start_s": 1355.103734375,
+      "end_s": 1800.1383125
+    },
+    {
+      "recording_id": "Speaker39",
+      "start_s": 1181.406140625,
+      "end_s": 1568.5415208333334
+    },
+    {
+      "recording_id": "Speaker4",
+      "start_s": 1140.9899375,
+      "end_s": 1514.65325
+    },
+    {
+      "recording_id": "Speaker40",
+      "start_s": 951.28025,
+      "end_s": 1261.707
+    },
+    {
+      "recording_id": "Speaker41",
+      "start_s": 930.021765625,
+      "end_s": 1233.3623541666666
+    },
+    {
+      "recording_id": "Speaker42",
+      "start_s": 1330.3781875,
+      "end_s": 1767.1709166666667
+    },
+    {
+      "recording_id": "Speaker43",
+      "start_s": 1031.8788749999999,
+      "end_s": 1369.1718333333333
+    },
+    {
+      "recording_id": "Speaker44",
+      "start_s": 1125.86596875,
+      "end_s": 1494.4879583333334
+    },
+    {
+      "recording_id": "Speaker46",
+      "start_s": 1026.144125,
+      "end_s": 1361.5255
+    },
+    {
+      "recording_id": "Speaker47",
+      "start_s": 1019.87709375,
+      "end_s": 1353.1694583333333
+    },
+    {
+      "recording_id": "Speaker48",
+      "start_s": 1278.3495,
+      "end_s": 1697.7993333333334
+    },
+    {
+      "recording_id": "Speaker49",
+      "start_s": 1029.48875,
+      "end_s": 1365.985
+    },
+    {
+      "recording_id": "Speaker5",
+      "start_s": 914.7365625,
+      "end_s": 1212.9820833333333
+    },
+    {
+      "recording_id": "Speaker50",
+      "start_s": 1287.343375,
+      "end_s": 1709.7911666666666
+    },
+    {
+      "recording_id": "Speaker51",
+      "start_s": 1144.665421875,
+      "end_s": 1519.5538958333334
+    },
+    {
+      "recording_id": "Speaker53",
+      "start_s": 1092.5998125,
+      "end_s": 1450.1330833333334
+    },
+    {
+      "recording_id": "Speaker54",
+      "start_s": 1220.08096875,
+      "end_s": 1620.1079583333333
+    },
+    {
+      "recording_id": "Speaker56",
+      "start_s": 1048.04246875,
+      "end_s": 1390.7232916666667
+    },
+    {
+      "recording_id": "Speaker57",
+      "start_s": 1109.52365625,
+      "end_s": 1472.6982083333332
+    },
+    {
+      "recording_id": "Speaker59",
+      "start_s": 875.9300000000001,
+      "end_s": 1161.24
+    },
+    {
+      "recording_id": "Speaker6",
+      "start_s": 1157.173140625,
+      "end_s": 1536.2308541666666
+    },
+    {
+      "recording_id": "Speaker60",
+      "start_s": 1145.18259375,
+      "end_s": 1520.2434583333334
+    },
+    {
+      "recording_id": "Speaker61",
+      "start_s": 1099.9433125,
+      "end_s": 1459.9244166666667
+    },
+    {
+      "recording_id": "Speaker62",
+      "start_s": 1092.48228125,
+      "end_s": 1449.976375
+    },
+    {
+      "recording_id": "Speaker63",
+      "start_s": 972.12434375,
+      "end_s": 1289.499125
+    },
+    {
+      "recording_id": "Speaker69",
+      "start_s": 1051.33359375,
+      "end_s": 1395.1114583333333
+    },
+    {
+      "recording_id": "Speaker7",
+      "start_s": 905.26515625,
+      "end_s": 1200.3535416666666
+    },
+    {
+      "recording_id": "Speaker72",
+      "start_s": 971.8386875,
+      "end_s": 1289.11825
+    },
+    {
+      "recording_id": "Speaker8",
+      "start_s": 948.6158437500001,
+      "end_s": 1258.1544583333334
+    },
+    {
+      "recording_id": "Speaker84",
+      "start_s": 436.03134374999996,
+      "end_s": 574.7084583333333
+    },
+    {
+      "recording_id": "Speaker9",
+      "start_s": 1020.2133281249999,
+      "end_s": 1353.6177708333332
+    }
+  ]
+}

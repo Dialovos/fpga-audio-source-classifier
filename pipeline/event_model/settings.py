@@ -86,8 +86,8 @@ def check_settings(settings) -> None:
     _required(settings, defaults)
 
     _number(settings["seed"], "seed", 0, whole=True)
-    _number(settings["sample_rate"], "sample_rate", 192000, 192000, whole=True)
-    _number(settings["clip_seconds"], "clip_seconds", 1 / 192000)
+    _number(settings["sample_rate"], "sample_rate", 48000, 48000, whole=True)
+    _number(settings["clip_seconds"], "clip_seconds", 1 / 48000)
     _number(settings["edge_margin_s"], "edge_margin_s", 0)
 
     if 2 * settings["edge_margin_s"] >= settings["clip_seconds"]:
@@ -196,8 +196,8 @@ def _check_features_model(settings) -> None:
         raise ValueError("features.short_window must not exceed long_window")
 
     for prefix in ("short", "long"):
-        _number(features[f"{prefix}_min_hz"], f"features.{prefix}_min_hz", 1e-9, 96000)
-        _number(features[f"{prefix}_max_hz"], f"features.{prefix}_max_hz", 1e-9, 96000)
+        _number(features[f"{prefix}_min_hz"], f"features.{prefix}_min_hz", 1e-9, 24000)
+        _number(features[f"{prefix}_max_hz"], f"features.{prefix}_max_hz", 1e-9, 24000)
 
         if features[f"{prefix}_min_hz"] >= features[f"{prefix}_max_hz"]:
             raise ValueError(f"features.{prefix}_min_hz must be below {prefix}_max_hz")
@@ -224,7 +224,7 @@ def _check_events(settings) -> None:
 
     for kind in EVENT_TYPES:
         for key, value in events[kind].items():
-            low = 1 / 192000
+            low = 1 / 48000
 
             if key.endswith("_db"):
                 low = -300
@@ -232,7 +232,7 @@ def _check_events(settings) -> None:
             high = np.inf
 
             if key.endswith("_hz"):
-                high = 95999
+                high = 23999
 
             _range(value, f"events.{kind}.{key}", low, high)
 
@@ -301,7 +301,7 @@ def _check_filters_noise(settings) -> None:
                 raise ValueError(f"filters.orders.{kind} is not supported")
 
     for key in ("highpass_cutoff_hz", "lowpass_cutoff_hz", "bandpass_low_hz", "bandpass_high_hz"):
-        _range(filters[key], f"filters.{key}", 1e-9, 95999)
+        _range(filters[key], f"filters.{key}", 1e-9, 23999)
 
     if filters["bandpass_low_hz"][1] >= filters["bandpass_high_hz"][0]:
         raise ValueError("filters.bandpass_low_hz must end below bandpass_high_hz")

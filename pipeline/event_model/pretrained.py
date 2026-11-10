@@ -116,7 +116,7 @@ def load_panns(checkpoint_path):
 
 
 # Returns mono audio resampled to 32 kHz, the rate CNN14 was trained at, using
-# whole-number up and down factors (192 kHz is 1 up and 6 down).
+# whole-number up and down factors (48 kHz is 2 up and 3 down).
 def to_32k(audio, sample_rate) -> np.ndarray:
     common = gcd(PANNS_RATE, int(sample_rate))
 

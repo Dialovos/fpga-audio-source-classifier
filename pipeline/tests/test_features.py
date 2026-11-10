@@ -7,7 +7,7 @@ from scipy import signal
 
 from pipeline.filter_id.features import band_centers, band_edges, spectrum_features
 
-FS = 192_000
+FS = 48_000
 
 
 # Tests: the band layout has one more edge than bands, starts and ends where we asked, gives every band the same

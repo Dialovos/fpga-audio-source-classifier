@@ -21,7 +21,7 @@ import soundfile as sf
 from pipeline.event_model import events, pretrained
 from pipeline.event_model.model import clip_features
 
-FS = 192_000
+FS = 48_000
 REPO = Path(__file__).parents[2]
 SETTINGS_PATH = REPO / "pipeline" / "event_model" / "settings.json"
 
@@ -82,7 +82,7 @@ def test_output_has_527_probabilities_every_10_ms(model):
     assert np.all((rows >= 0) & (rows <= 1))
 
 
-# Tests: clip_features with only PANNs on gives 300 rows of 527 for 3 s at 192 kHz, one per frame of ours.
+# Tests: clip_features with only PANNs on gives 300 rows of 527 for 3 s at 48 kHz, one per frame of ours.
 # Why: training and detect use clip_features, so the real model has to line up there too, not only in the stand-in.
 def test_clip_features_line_up_with_our_frames(model):
     settings = panns_settings()
@@ -97,7 +97,7 @@ def test_clip_features_line_up_with_our_frames(model):
 # Tests: 10 s of a team voiceover has Speech among its top 3 classes.
 # Why: if the model can't hear speech in our own recordings, its other answers on them can't be trusted either.
 def test_voiceover_scores_high_on_speech(model):
-    path = REPO / "data" / "test-data-prelim" / "VO1.wav"
+    path = REPO / "data" / "test-data-prelim-48k" / "VO1.wav"
 
     if not path.is_file():
         pytest.fail(f"Put the team's VO1.wav in {path.parent.relative_to(REPO).as_posix()}/ first.")

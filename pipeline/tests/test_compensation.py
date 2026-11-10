@@ -23,7 +23,7 @@ from pipeline.filters import apply_filter, design_filter
 # Hand-built inverse
 # ********************************
 
-FS = 192000
+FS = 48000
 SPEC = {
     "type": "lowpass",
     "family": "butter",
