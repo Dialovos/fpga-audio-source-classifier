@@ -5,9 +5,10 @@ A small stand-in takes CNN14's place and gives fixed numbers, so these run in
 the normal test run with nothing downloaded. pipeline/tests/check_panns.py
 checks the real model on its own.
 
-This file has two groups:
+This file has three groups:
     * Stand-in model
     * Resampling, lining up, and switches
+    * Loading and running
 """
 
 from __future__ import annotations
@@ -46,6 +47,20 @@ def stand_in_rows(model, audio_32k):
     column_numbers = np.arange(pretrained.PANNS_CLASSES)[None, :]
 
     return row_numbers + column_numbers / 1000
+
+
+# Returns one row per 320 samples, plus one, like CNN14. Each row holds the
+# sample at that row's place in the audio, so a test can tell where every
+# row came from.
+def stand_in_piece(model, audio_32k):
+    rows = len(audio_32k) // 320 + 1
+    values = np.empty((rows, 2), dtype=np.float32)
+
+    for row in range(rows):
+        sample = min(row * 320, len(audio_32k) - 1)
+        values[row] = audio_32k[sample]
+
+    return values
 
 
 # Returns the default settings with PANNs turned on or off as asked.
@@ -123,12 +138,73 @@ def test_clip_features_switches_and_column_order(stand_in):
     assert panns[3, 2] == pytest.approx(3.002)
 
 
+# Tests: the PANNs columns are float32, alone and next to our own features.
+# Why: float64 PANNs columns turn the whole table into float64, which doubles
+# the memory a training run with both feature sets needs.
+def test_panns_columns_stay_float32(stand_in):
+    audio = np.random.default_rng(7).standard_normal(FS // 2)
+
+    panns, _ = clip_features(audio, settings_with(False, True))
+    both, _ = clip_features(audio, settings_with(True, True))
+
+    assert panns.dtype == np.float32
+    assert both.dtype == np.float32
+
+
+# ********************************
+# Loading and running
+# ********************************
+
+
 # Tests: a missing checkpoint stops with a message that says how to get it.
 # Why: a teammate who turns PANNs on before downloading it should know what to
 # run instead of seeing a PyTorch error.
 def test_missing_checkpoint_says_how_to_get_it(tmp_path):
     with pytest.raises(FileNotFoundError, match="pretrained download"):
         pretrained.load_panns(tmp_path / "missing.pth")
+
+
+# Tests: a checkpoint that isn't the file we use stops with a message that
+# says how to get the right one.
+# Why: the plain Cnn14 checkpoint has the same layer names, so it would load
+# with no error and give the event model different numbers.
+def test_wrong_checkpoint_file_is_refused(monkeypatch, tmp_path):
+    labels = tmp_path / "class_labels_indices.csv"
+    labels.write_text("index,mid,display_name\n", encoding="utf-8")
+    monkeypatch.setattr(pretrained, "LABELS_PATH", labels)
+
+    wrong = tmp_path / "wrong.pth"
+    wrong.write_bytes(b"not the checkpoint")
+
+    with pytest.raises(ValueError, match="pretrained download"):
+        pretrained.load_panns(wrong)
+
+
+# Tests: audio shorter than CNN14 can take stops with a message that gives
+# the shortest length.
+# Why: PyTorch's own error for audio that short doesn't say what's wrong.
+def test_too_short_audio_says_the_shortest_length():
+    audio = np.zeros(pretrained.SHORTEST_SAMPLES - 1)
+
+    with pytest.raises(ValueError, match="at least 0.31 s"):
+        pretrained.run_panns(StandInPanns(), audio)
+
+
+# Tests: audio longer than one piece gives the same rows as running it all at
+# once, whether it ends partway through a piece, exactly on one, or one
+# sample into the next.
+# Why: long recordings go through PANNs a piece at a time to save memory, and
+# a row lost or doubled where two pieces meet would shift every event after
+# it.
+def test_long_audio_in_pieces_matches_one_pass(monkeypatch):
+    monkeypatch.setattr(pretrained, "_run_piece", stand_in_piece)
+    piece = pretrained.PIECE_SAMPLES
+
+    for samples in (2 * piece + 12345, 2 * piece, piece + 1):
+        audio = np.arange(samples, dtype=np.float32)
+        rows = pretrained.run_panns(StandInPanns(), audio)
+
+        np.testing.assert_array_equal(rows, stand_in_piece(None, audio))
 
 
 # Tests: a model trained on both feature sets saves without the PANNs model,

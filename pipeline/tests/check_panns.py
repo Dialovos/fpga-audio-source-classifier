@@ -82,6 +82,31 @@ def test_output_has_527_probabilities_every_10_ms(model):
     assert np.all((rows >= 0) & (rows <= 1))
 
 
+# Tests: the shortest audio run_panns accepts (0.31 s) gets through the real network and gives 32 rows.
+# Why: run_panns refuses anything shorter with its own message, so that limit has to be the network's real one.
+def test_shortest_audio_runs(model):
+    rows = pretrained.run_panns(model, np.zeros(pretrained.SHORTEST_SAMPLES))
+
+    assert rows.shape == (32, pretrained.PANNS_CLASSES)
+
+
+# Tests: 70 s of noise that changes loudness every second gives the same rows a piece at a time as in one pass,
+# within 0.000001.
+# Why: the pieces only match one pass if the extra audio on each side covers everything the real network looks at
+# around a row. Half that much extra audio is off by 0.01.
+def test_long_audio_in_pieces_matches_one_pass(model):
+    rng = np.random.default_rng(7)
+    seconds = 70
+    loudness = np.repeat(rng.uniform(0.005, 0.2, seconds), pretrained.PANNS_RATE)
+    noise = (rng.standard_normal(seconds * pretrained.PANNS_RATE) * loudness).astype(np.float32)
+
+    pieces = pretrained.run_panns(model, noise)
+    one_pass = pretrained._run_piece(model, noise)
+
+    assert pieces.shape == one_pass.shape == (7001, pretrained.PANNS_CLASSES)
+    assert np.max(np.abs(pieces - one_pass)) < 1e-6
+
+
 # Tests: clip_features with only PANNs on gives 300 rows of 527 for 3 s at 48 kHz, one per frame of ours.
 # Why: training and detect use clip_features, so the real model has to line up there too, not only in the stand-in.
 def test_clip_features_line_up_with_our_frames(model):

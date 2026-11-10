@@ -98,6 +98,8 @@ Before turning it on (`"use_panns": true`), get its checkpoint (~330 MB, into `d
 python -m pipeline.event_model.pretrained download
 ```
 
+It runs on an NVIDIA card when PyTorch can use one, and on the CPU when it can't. A WAV has to be at least 0.31 s long for it, and anything longer than about a minute goes through a piece at a time, so a long recording doesn't run out of memory. It also checks that the checkpoint is the file from the download command, since other CNN14 checkpoints load without an error and give different numbers.
+
 The normal test run checks the PANNs code with a stand-in. To check the real model, run this on its own (it needs ~1 GB of memory):
 
 ```
