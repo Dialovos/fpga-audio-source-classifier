@@ -86,7 +86,7 @@ To compare detection on four versions of the same held-out test clips (clean, fi
 python -m pipeline.event_model compare --model results/<run>/model.joblib --filter-id-model <filter-id-model.joblib> --out results/<run>/compare
 ```
 
-It writes the scores to `metrics.json`, one line per test case to `cases.jsonl`, and a few example WAVs to `examples/`. Leave out `--filter-id-model` to skip the AI guess version. The filter gets undone with our Python copy of the C inverse. On Linux, where the C program builds, add `--method c --c-command pipeline/reversable_filters/filter`.
+It writes the scores to `metrics.json`, one line per test case to `cases.jsonl`, and a few example WAVs to `examples/`. Leave out `--filter-id-model` to skip the AI guess version. The filter gets undone with our Python copy of the C inverse. On Linux, where the C program builds, add `--method c --c-command pipeline/reversable_filters/filter`. The C program reads and writes 16-bit PCM, so its undone audio clips at full scale, while the Python copy keeps the peaks.
 
 ### The pretrained model (PANNs)
 

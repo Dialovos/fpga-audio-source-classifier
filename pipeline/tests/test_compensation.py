@@ -153,27 +153,30 @@ def fake_filter(tmp_path, mode="copy"):
         "from pathlib import Path\n"
         "import soundfile as sf\n"
         f"Path({str(log)!r}).write_text(json.dumps({{'args': sys.argv[1:], 'cwd': os.getcwd()}}))\n"
-        "audio, rate = sf.read('in.wav')\n"
+        "audio, rate = sf.read('in.wav', dtype='int16')\n"
         f"mode = {mode!r}\n"
         "if mode == 'short':\n"
         "    audio = audio[:-1]\n"
-        "if mode != 'missing':\n"
-        "    sf.write('out.wav', audio, rate, subtype='FLOAT')\n"
+        "if mode == 'float':\n"
+        "    sf.write('out.wav', audio / 32768, rate, subtype='FLOAT')\n"
+        "elif mode != 'missing':\n"
+        "    sf.write('out.wav', audio, rate, subtype='PCM_16')\n"
         "print('fake filter output')\n"
-        "sys.exit(1)\n",
+        "if mode == 'failed':\n"
+        "    sys.exit(1)\n",
         encoding="utf-8",
     )
 
     return [sys.executable, str(script)], log
 
 
-# Tests: all filter arguments, half order, exit 1, FLOAT precision and separate
-# folders are right.
-# Why: the real binary's unusual exit code and shared int.wav need this exact
-# wrapper.
+# Tests: all filter arguments, half order, 16-bit rounding and separate folders
+# are right, and audio past full scale stops.
+# Why: the real binary reads and writes 16-bit PCM and shares int.wav, so it
+# needs this exact wrapper.
 def test_c_arguments_and_private_folders(tmp_path):
     command, log = fake_filter(tmp_path)
-    audio = np.array([0.0, 0.5, 2.0, -2.0])
+    audio = np.array([0.0, 0.5, -0.25, -1.0])
     highpass = {
         "type": "highpass",
         "family": "butter",
@@ -216,12 +219,19 @@ def test_c_arguments_and_private_folders(tmp_path):
 
     assert len(folders) == 3
 
+    # 0.1 sits between two 16-bit steps, and full scale is one step past the top.
+    rounded = c_inverse(np.array([0.1, 1.0]), FS, SPEC, command)
+    np.testing.assert_array_equal(rounded, np.array([3277, 32767]) / 32768)
 
-# Tests: missing or wrong-length out.wav stops and includes the program's
-# output.
-# Why: exit 1 alone does not prove that the inverse made a valid output.
+    with pytest.raises(ValueError, match="full scale"):
+        c_inverse(np.array([0.0, 2.0]), FS, SPEC, command)
+
+
+# Tests: a missing, wrong-length or 32-bit float out.wav, or an exit code other
+# than 0, stops and includes the program's output.
+# Why: exit 0 alone does not prove that the inverse made a valid output.
 def test_c_bad_outputs_stop(tmp_path):
-    for mode in ("short", "missing"):
+    for mode in ("short", "missing", "float", "failed"):
         command, _ = fake_filter(tmp_path, mode)
 
         with pytest.raises(ValueError, match="fake filter output"):

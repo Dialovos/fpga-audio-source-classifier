@@ -1038,10 +1038,8 @@ def test_comparison_versions_and_both_inverse_methods(development, tmp_path):
     script = tmp_path / "fake_filter.py"
     script.write_text(
         "import soundfile as sf\n"
-        "import sys\n"
-        "audio, rate = sf.read('in.wav')\n"
-        "sf.write('out.wav', audio, rate, subtype='FLOAT')\n"
-        "sys.exit(1)\n",
+        "audio, rate = sf.read('in.wav', dtype='int16')\n"
+        "sf.write('out.wav', audio, rate, subtype='PCM_16')\n",
         encoding="utf-8",
     )
     fid = small_filter_id(settings["sources"]["source_dir"])

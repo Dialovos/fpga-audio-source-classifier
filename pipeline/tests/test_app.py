@@ -180,16 +180,14 @@ def clips(model_files, tmp_path_factory):
     return paths
 
 
-# Returns the path of a stand-in C program that copies in.wav to out.wav and
-# exits with 1, the way the real C program does when it works.
+# Returns the path of a stand-in C program that copies in.wav to out.wav as
+# 16-bit PCM, the format the real C program reads and writes.
 def fake_c_program(folder):
     script = folder / "fake_filter.py"
     script.write_text(
         "import soundfile as sf\n"
-        "import sys\n"
-        "audio, rate = sf.read('in.wav')\n"
-        "sf.write('out.wav', audio, rate, subtype='FLOAT')\n"
-        "sys.exit(1)\n",
+        "audio, rate = sf.read('in.wav', dtype='int16')\n"
+        "sf.write('out.wav', audio, rate, subtype='PCM_16')\n",
         encoding="utf-8",
     )
 

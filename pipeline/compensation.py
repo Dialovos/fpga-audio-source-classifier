@@ -1,5 +1,8 @@
 """
-Undo known Butterworth filters without clipping the recovered audio.
+Undo known Butterworth filters.
+
+The Python inverse keeps the recovered audio's peaks, even past full scale. The
+C program works on 16-bit PCM WAVs, so its recovered audio clips there.
 
 This file has three groups:
     * Shared checks
@@ -139,15 +142,26 @@ def _arguments(spec) -> list[str]:
     ]
 
 
-# Returns the C program's recovered audio. It stops with a ValueError, including
-# the program's output, if the command fails or its WAV is invalid. Each call
-# gets its own system temporary folder so the program's int.wav is not shared.
+# Returns the C program's recovered audio. The program reads and writes 48 kHz
+# 16-bit PCM WAVs, so the audio goes in rounded to 16-bit steps, and anything
+# the undo pushes past full scale comes back clipped. It stops with a
+# ValueError, including the program's output, if the audio is past full scale,
+# the command fails, or its WAV is invalid. Each call gets its own system
+# temporary folder so the program's int.wav is not shared.
 def c_inverse(audio, sample_rate, spec, command) -> np.ndarray:
     samples = _samples(audio)
     _filter(spec, sample_rate)
 
     if not isinstance(command, list) or not command:
         raise ValueError("command must be a non-empty list")
+
+    if np.max(np.abs(samples)) > 1:
+        raise ValueError("audio must be within full scale for the C program's 16-bit WAV")
+
+    # The C program reads each sample as its 16-bit code / 32768, so save the
+    # codes themselves. A sample at exactly full scale rounds to 32768, one past
+    # the highest code, so it gets the highest code.
+    codes = np.clip(np.round(samples * 32768), -32768, 32767).astype(np.int16)
 
     absolute_command = []
 
@@ -164,7 +178,7 @@ def c_inverse(audio, sample_rate, spec, command) -> np.ndarray:
 
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder)
-        sf.write(path / "in.wav", samples, sample_rate, subtype="FLOAT")
+        sf.write(path / "in.wav", codes, sample_rate, subtype="PCM_16")
 
         try:
             result = subprocess.run(
@@ -179,22 +193,19 @@ def c_inverse(audio, sample_rate, spec, command) -> np.ndarray:
 
         output = result.stdout + result.stderr
 
-        if result.returncode not in (0, 1) or not (path / "out.wav").is_file():
+        if result.returncode != 0 or not (path / "out.wav").is_file():
             raise ValueError(f"command failed or out.wav is missing (exit {result.returncode}): {output}")
 
         try:
             info = sf.info(path / "out.wav")
-            recovered, rate = sf.read(path / "out.wav", dtype="float64")
+            recovered, rate = sf.read(path / "out.wav", dtype="int16")
         except (sf.LibsndfileError, OSError) as error:
             raise ValueError(f"out.wav could not be read: {output}\n{error}") from error
 
-        if info.subtype != "FLOAT" or info.channels != 1 or rate != sample_rate or len(recovered) != len(samples):
-            raise ValueError(f"out.wav must be FLOAT mono with the input rate and length: {output}")
+        if info.subtype != "PCM_16" or info.channels != 1 or rate != sample_rate or len(recovered) != len(samples):
+            raise ValueError(f"out.wav must be 16-bit PCM mono with the input rate and length: {output}")
 
-        if not np.all(np.isfinite(recovered)):
-            raise ValueError(f"out.wav must be finite: {output}")
-
-        return recovered
+        return recovered / 32768
 
 
 # Returns recovered audio and the inverse settings. It stops with a ValueError

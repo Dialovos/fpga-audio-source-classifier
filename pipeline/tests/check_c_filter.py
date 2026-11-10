@@ -1,7 +1,7 @@
 """
 Checks for the C filter program in pipeline/reversable_filters/.
 
-These build the C program and run it the way the rest of the project will, as a program on 32-bit float WAV
+These build the C program and run it the way the rest of the project will, as a program on 48 kHz 16-bit PCM WAV
 files. Options 1-3 (applying a filter) get compared with SciPy's Butterworth filters, and options 4-6 (undoing a
 filter) with the same regularized inverse written in Python. The undo also gets checked against the original signal
 and against an undo done in one piece, and the program gets bad calls to see what it does. The C code itself isn't
@@ -42,9 +42,13 @@ LOW_LOWPASS_HZ = 500.0
 # The C program counts the order on each side of a band-pass, and only takes these.
 ORDERS = [1, 2, 4]
 
-# How close the C output has to be to Python, as a share of the signal's peak. The C program saves 32-bit floats,
-# which round at about 6e-8 of the peak, so this leaves plenty of room for that and nothing for a wrong filter.
-TOLERANCE = 1e-5
+# One 16-bit step, the smallest change a sample in the C program's WAV files can show.
+STEP = 1 / 32768
+
+# How close the C output has to be to Python, in 16-bit steps. The C program drops the fraction when it saves a
+# sample, so each one can be up to a step off, and a band-pass saves twice (int.wav in between). 3 steps leaves
+# room for that and little for a wrong filter, which moves the output by tens of steps or more.
+TOLERANCE_STEPS = 3
 
 # For the round trip (filter, then undo, then compare with the original). The signal is 1 s, so it fits in one
 # block and has no joins. The first and last ROUND_TRIP_EDGE samples don't count, because the inverse filter needs
@@ -58,10 +62,8 @@ ROUND_TRIP_TOLERANCE = 1e-2
 
 
 # Builds the C program once for this file and returns its path. The source files get copied to a temporary folder
-# first, so the build never leaves files in the repo. The flags are the Makefile's, plus one: newer gcc (14 and up)
-# stops on a call to a function that wasn't declared, and main.c has two right now (strcmp without <string.h>, and
-# reverse_bilinear_highpass, which isn't in Butterworth.h). The extra flag turns those back into warnings. If the
-# build fails, every check fails with the compiler's output.
+# first, so the build never leaves files in the repo. If the build fails, every check fails with the compiler's
+# output.
 @pytest.fixture(scope="module")
 def program(tmp_path_factory):
     if shutil.which("make") is None or shutil.which("gcc") is None:
@@ -71,21 +73,26 @@ def program(tmp_path_factory):
     for name in ["main.c", "Butterworth.c", "Butterworth.h", "Makefile"]:
         shutil.copy(C_FOLDER / name, folder / name)
 
-    flags = "CFLAGS=-Wall -Wextra -O2 -std=c11 -Wno-error=implicit-function-declaration"
-    result = subprocess.run(["make", flags], cwd=folder, capture_output=True, text=True, check=False)
+    result = subprocess.run(["make"], cwd=folder, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         pytest.fail(f"the C program didn't build:\n{result.stdout}{result.stderr}")
 
     return folder / "filter"
 
 
-# Returns 4 s of white noise at an RMS of 0.1, already rounded to 32-bit floats. The C program reads 32-bit floats,
-# so rounding first means the C program and Python start from exactly the same samples. 4 s covers four of the
-# undo blocks, so the joins between blocks get checked too.
+# Returns the audio rounded to 16-bit steps, the way it gets saved for the C program. Rounding first means the C
+# program and Python start from exactly the same samples. Anything past full scale gets clipped.
+def to_16_bit(audio):
+    codes = np.clip(np.round(np.asarray(audio) / STEP), -32768, 32767)
+    return codes * STEP
+
+
+# Returns 4 s of white noise at an RMS of 0.1, already rounded to 16-bit steps. 4 s covers four of the undo
+# blocks, so the joins between blocks get checked too.
 def noise():
     rng = np.random.default_rng(4240)
     audio = 0.1 * rng.standard_normal(4 * FS)
-    return audio.astype(np.float32).astype(np.float64)
+    return to_16_bit(audio)
 
 
 # Returns SciPy's Butterworth filter as second-order sections. A band-pass is a high-pass at the low edge followed
@@ -140,7 +147,7 @@ def undo_in_one_piece(audio, sos):
 
 
 # Returns noise at an RMS of 0.1 that only has the frequencies the filter lets through (where its gain squared is at
-# least PASSBAND_GAIN), rounded to 32-bit floats like noise(). The undo can only bring back what the filter let
+# least PASSBAND_GAIN), rounded to 16-bit steps like noise(). The undo can only bring back what the filter let
 # through, so this is the signal to ask it to bring back.
 def passband_noise(sos, samples):
     angles = 2 * np.pi * np.arange(samples // 2 + 1) / samples
@@ -149,34 +156,39 @@ def passband_noise(sos, samples):
     rng = np.random.default_rng(4240)
     audio = np.fft.irfft(np.fft.rfft(rng.standard_normal(samples)) * passed, samples)
     audio *= 0.1 / audio.std()
-    return audio.astype(np.float32).astype(np.float64)
+    return to_16_bit(audio)
+
+
+# Saves audio that's already on 16-bit steps as the 16-bit PCM WAV the C program reads.
+def write_wav(path, audio):
+    codes = np.round(np.asarray(audio) / STEP).astype(np.int16)
+    sf.write(path, codes, FS, subtype="PCM_16")
 
 
 # Runs the C program on audio in a new folder, and returns its output audio. The arguments follow its command
 # line: type, family, order, high-pass cutoff, low-pass cutoff, input file, output file, and menu option. The
 # cutoffs are the readme's unless the check passes others. Each run gets its own folder, since a band-pass
 # (option 3) writes an int.wav next to its files. It fails the check if the program didn't finish, or its output
-# isn't a 32-bit float WAV with as many samples as the input.
+# isn't a 16-bit PCM WAV with as many samples as the input.
 def run_program(program, folder, audio, kind, order, option, highpass_hz=HIGHPASS_HZ, lowpass_hz=LOWPASS_HZ):
     folder.mkdir()
-    sf.write(folder / "in.wav", audio, FS, subtype="FLOAT")
+    write_wav(folder / "in.wav", audio)
 
     arguments = [str(program), kind, "butter", str(order), str(highpass_hz), str(lowpass_hz),
                  "in.wav", "out.wav", str(option)]
     result = subprocess.run(arguments, cwd=folder, capture_output=True, text=True, check=False)
     output_text = result.stdout + result.stderr
 
-    # The program returns 1 when it works, so 0 and 1 both count as finished.
-    assert result.returncode in (0, 1), f"exit code {result.returncode}:\n{output_text}"
+    assert result.returncode == 0, f"exit code {result.returncode}:\n{output_text}"
     assert (folder / "out.wav").exists(), f"no out.wav:\n{output_text}"
 
     info = sf.info(folder / "out.wav")
-    assert info.subtype == "FLOAT"
+    assert info.subtype == "PCM_16"
     assert info.samplerate == FS
     assert info.frames == len(audio)
 
-    output, _ = sf.read(folder / "out.wav", dtype="float64")
-    return output
+    codes, _ = sf.read(folder / "out.wav", dtype="int16")
+    return codes * STEP
 
 
 # Returns how far the C output is from the reference, as a share of the reference's peak, and prints it so a
@@ -187,10 +199,18 @@ def difference_of(c_output, reference, label):
     return difference
 
 
-# Fails the check if the C output is further from the Python output than TOLERANCE times the Python output's peak.
+# Returns how far the C output is from the reference in 16-bit steps, and prints it so a passing run still shows
+# how close they were.
+def steps_apart(c_output, reference, label):
+    steps = np.max(np.abs(c_output - reference)) / STEP
+    print(f"{label}: largest difference {steps:.2f} steps")
+    return steps
+
+
+# Fails the check if the C output is TOLERANCE_STEPS or more from the Python output.
 def assert_close(c_output, python_output, label):
-    difference = difference_of(c_output, python_output, label)
-    assert difference < TOLERANCE, f"{label}: C and Python differ by {difference:.2e} of the peak"
+    steps = steps_apart(c_output, python_output, label)
+    assert steps < TOLERANCE_STEPS, f"{label}: C and Python differ by {steps:.2f} steps"
 
 
 # Tests: option 1 (low-pass) gives the same output as SciPy's Butterworth low-pass, at orders 1, 2, and 4.
@@ -206,9 +226,7 @@ def test_low_pass_matches_scipy(program, tmp_path):
 
 # Tests: option 2 (high-pass) gives the same output as SciPy's Butterworth high-pass at the high-pass cutoff, at
 #   orders 1, 2, and 4.
-# Why: same as the low-pass. Right now this fails: main.c passes the low-pass cutoff (AI_fc_lp) to the high-pass
-#   for option 2, so it filters at 5 kHz instead of 300 Hz. It passes once that's fixed. We only call options 4-6,
-#   so it doesn't hold us up.
+# Why: same as the low-pass.
 def test_high_pass_matches_scipy(program, tmp_path):
     audio = noise()
     for order in ORDERS:
@@ -237,7 +255,7 @@ def test_undo_matches_python(program, tmp_path):
     for kind, option in [("LP", 4), ("HP", 5), ("BP", 6)]:
         for order in ORDERS:
             sos = butterworth(kind, order)
-            filtered = signal.sosfilt(sos, noise()).astype(np.float32).astype(np.float64)
+            filtered = to_16_bit(signal.sosfilt(sos, noise()))
             c_output = run_program(program, tmp_path / f"{kind}{order}", filtered, kind, order, option)
             python_output = undo_in_python(filtered, sos)
             assert_close(c_output, python_output, f"undo {kind} order {order}")
@@ -247,10 +265,10 @@ def test_undo_matches_python(program, tmp_path):
 # Why: the program only knows Butterworth filters. Anything else has to fail loudly, not leave an output that looks
 #   like it worked.
 def test_unknown_family_stops(program, tmp_path):
-    sf.write(tmp_path / "in.wav", noise(), FS, subtype="FLOAT")
+    write_wav(tmp_path / "in.wav", noise())
     arguments = [str(program), "LP", "cheby", "2", str(HIGHPASS_HZ), str(LOWPASS_HZ), "in.wav", "out.wav", "1"]
     result = subprocess.run(arguments, cwd=tmp_path, capture_output=True, text=True, check=False)
-    assert result.returncode not in (0, 1)
+    assert result.returncode != 0
     assert not (tmp_path / "out.wav").exists()
 
 
@@ -264,7 +282,7 @@ def test_undo_brings_back_the_signal(program, tmp_path):
         for order in ORDERS:
             sos = butterworth(kind, order)
             original = passband_noise(sos, ROUND_TRIP_SAMPLES)
-            filtered = signal.sosfilt(sos, original).astype(np.float32).astype(np.float64)
+            filtered = to_16_bit(signal.sosfilt(sos, original))
             c_output = run_program(program, tmp_path / f"{kind}{order}", filtered, kind, order, option)
 
             middle = slice(ROUND_TRIP_EDGE, -ROUND_TRIP_EDGE)
@@ -293,26 +311,27 @@ def test_undo_matches_one_piece(program, tmp_path):
         for kind, option in [("LP", 4), ("HP", 5), ("BP", 6)]:
             for order in ORDERS:
                 sos = butterworth(kind, order, highpass_hz, lowpass_hz)
-                filtered = signal.sosfilt(sos, audio).astype(np.float32).astype(np.float64)
+                filtered = to_16_bit(signal.sosfilt(sos, audio))
                 folder = tmp_path / f"{kind}{order}-{highpass_hz:g}-{lowpass_hz:g}"
                 c_output = run_program(program, folder, filtered, kind, order, option, highpass_hz, lowpass_hz)
 
                 label = f"undo {kind} order {order} at {highpass_hz:g} and {lowpass_hz:g} Hz"
-                difference = difference_of(c_output, undo_in_one_piece(filtered, sos), label)
-                if difference >= TOLERANCE:
-                    problems.append(f"{label}: off by {difference:.2e} of the peak")
+                steps = steps_apart(c_output, undo_in_one_piece(filtered, sos), label)
+                if steps >= TOLERANCE_STEPS:
+                    problems.append(f"{label}: off by {steps:.1f} steps")
     assert not problems, "the undo has errors at the block joins:\n" + "\n".join(problems)
 
 
-# Tests: a call the program can't carry out (the input file is missing, empty, or not a WAV, or the menu option isn't
-#   one it has) leaves no out.wav behind.
-# Why: the program returns 1 whether it did the job or not, so out.wav not being there is the only way a script can
+# Tests: a call the program can't carry out (the input file is missing, empty, not a WAV, or a 32-bit float WAV, or
+#   the menu option isn't one it has) leaves no out.wav behind.
+# Why: the program returns 0 whether it did the job or not, so out.wav not being there is the only way a script can
 #   tell the call failed.
 def test_bad_calls_leave_no_output(program, tmp_path):
     calls = [
         ("input missing", None, 1),
         ("input empty", b"", 1),
         ("input not a WAV", b"this is text, not a WAV file. " * 10, 1),
+        ("input in 32-bit float", "float", 1),
         ("option 0", "audio", 0),
         ("option 7", "audio", 7),
         ("option 9", "audio", 9),
@@ -322,6 +341,8 @@ def test_bad_calls_leave_no_output(program, tmp_path):
         folder = tmp_path / label.replace(" ", "-")
         folder.mkdir()
         if content == "audio":
+            write_wav(folder / "in.wav", noise())
+        elif content == "float":
             sf.write(folder / "in.wav", noise(), FS, subtype="FLOAT")
         elif content is not None:
             (folder / "in.wav").write_bytes(content)
@@ -338,19 +359,19 @@ def test_bad_calls_leave_no_output(program, tmp_path):
 # Why: the readme says 1, 2, and 4 are the only orders it supports. Anything else has to fail loudly, not leave an
 #   output that looks like it worked.
 #   Right now this fails: main.c doesn't check the order, and the filter code only sets up orders 1, 2, and 4, so the
-#   program exits with 1 and writes an out.wav anyway. It passes once the order gets checked.
+#   program exits with 0 and writes an out.wav anyway. It passes once the order gets checked.
 def test_unsupported_order_stops(program, tmp_path):
     problems = []
     for order in [0, 3, 8]:
         folder = tmp_path / f"order{order}"
         folder.mkdir()
-        sf.write(folder / "in.wav", noise(), FS, subtype="FLOAT")
+        write_wav(folder / "in.wav", noise())
 
         arguments = [str(program), "LP", "butter", str(order), str(HIGHPASS_HZ), str(LOWPASS_HZ), "in.wav",
                      "out.wav", "1"]
         result = subprocess.run(arguments, cwd=folder, capture_output=True, text=True, check=False, timeout=10)
         wrote = (folder / "out.wav").exists()
-        if result.returncode in (0, 1) or wrote:
+        if result.returncode == 0 or wrote:
             state = "written" if wrote else "not written"
             problems.append(f"order {order}: exit code {result.returncode}, out.wav {state}")
     assert not problems, "an unsupported order didn't stop the program:\n" + "\n".join(problems)
@@ -368,4 +389,4 @@ def test_wrong_argument_count_stops(program, tmp_path):
                                 stderr=subprocess.DEVNULL, check=False, timeout=5)
     except subprocess.TimeoutExpired:
         pytest.fail("the program was still running 5 s after a call with 8 arguments, so it's waiting at its menu")
-    assert result.returncode not in (0, 1)
+    assert result.returncode != 0
