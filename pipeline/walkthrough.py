@@ -316,7 +316,7 @@ def plot_spectra(versions, cfg):
     figure, axis = plt.subplots(figsize=(9, 3.5), dpi=90, layout="constrained")
 
     for name, audio in versions.items():
-        segment = min(32768, len(audio))
+        segment = min(8192, len(audio))
         freqs, power = signal.welch(audio, fs=sample_rate, nperseg=segment)
         decibels = 10 * np.log10(np.maximum(power[1:], 1e-20))
         axis.semilogx(freqs[1:], decibels, label=VERSION_NAMES[name], linewidth=1)
@@ -457,12 +457,15 @@ def _draw_events(axis, events, kind, row, matched, unmatched_color) -> None:
 def plot_test_clip(audio, record, detected, settings):
     labeled = record["events"]
     counts = match_events(detected, labeled, settings["scoring"])
+
+    # The spectrogram on top, then one short track per event type.
+    tracks = len(EVENT_TYPES)
     figure, axes = plt.subplots(
-        4, 1, figsize=(11, 6), dpi=90, sharex=True,
-        gridspec_kw={"height_ratios": [3, 1, 1, 1]}, layout="constrained",
+        1 + tracks, 1, figsize=(11, 3 + 0.75 * tracks), dpi=90, sharex=True,
+        gridspec_kw={"height_ratios": [3] + [1] * tracks}, layout="constrained",
     )
     frequencies, times, power = signal.spectrogram(
-        audio, fs=settings["sample_rate"], nperseg=16384, noverlap=8192,
+        audio, fs=settings["sample_rate"], nperseg=4096, noverlap=2048,
     )
     useful = (frequencies >= 20) & (frequencies <= 20000)
     decibels = 10 * np.log10(np.maximum(power[useful], 1e-14))
@@ -554,8 +557,11 @@ def show_comparison(metrics):
 
             print(f"{VERSION_NAMES[version]:<22} {kind:<11} {values[0]:>9} {values[1]:>8} {values[2]:>8}")
 
-    figure, axis = plt.subplots(figsize=(9, 3.5), dpi=90, layout="constrained")
+    figure, axis = plt.subplots(figsize=(10, 3.5), dpi=90, layout="constrained")
     positions = np.arange(len(versions))
+
+    # Each version gets a group of bars, one per type, centered on its tick.
+    width = 0.8 / len(EVENT_TYPES)
 
     for column, kind in enumerate(EVENT_TYPES):
         values = []
@@ -568,7 +574,8 @@ def show_comparison(metrics):
 
             values.append(value)
 
-        axis.bar(positions + (column - 1) * 0.24, values, width=0.24, label=kind)
+        offset = (column - (len(EVENT_TYPES) - 1) / 2) * width
+        axis.bar(positions + offset, values, width=width, label=kind)
 
     labels = []
 
@@ -579,7 +586,7 @@ def show_comparison(metrics):
     axis.set_ylim(0, 1.05)
     axis.set_ylabel("Event F1")
     axis.set_title("Same held-out cases for every audio version")
-    axis.legend(loc="upper right", ncols=3, fontsize=8)
+    axis.legend(loc="upper left", bbox_to_anchor=(1.01, 1), fontsize=8)
     axis.grid(axis="y", alpha=0.2)
 
     return figure

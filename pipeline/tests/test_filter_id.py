@@ -15,7 +15,7 @@ from scipy import signal
 from pipeline.filter_id import FilterIdModel, evaluate, load_model, save_model, spectrum_features, split_by_recording
 from pipeline.filter_id.__main__ import main
 
-FS = 192_000
+FS = 48_000
 CLIP_SECONDS = 0.5
 ALL_TYPES = ["highpass", "lowpass", "bandpass"]
 ORDER_4 = {"highpass": [4], "lowpass": [4], "bandpass": [4]}
@@ -195,7 +195,7 @@ def test_predict_stops_on_stereo_or_wrong_rate(all_types, tmp_path):
     _, model, _ = all_types
     path = save_for_predict(model, tmp_path)
     sf.write(tmp_path / "stereo.wav", np.zeros((FS, 2), dtype=np.float32), FS, subtype="FLOAT")
-    sf.write(tmp_path / "low-rate.wav", np.zeros(48_000, dtype=np.float32), 48_000, subtype="FLOAT")
-    for name in ("stereo.wav", "low-rate.wav"):
+    sf.write(tmp_path / "wrong-rate.wav", np.zeros(192_000, dtype=np.float32), 192_000, subtype="FLOAT")
+    for name in ("stereo.wav", "wrong-rate.wav"):
         with pytest.raises(SystemExit):
             main(["predict", "--model", str(path), str(tmp_path / name)])

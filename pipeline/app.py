@@ -3,7 +3,7 @@ The offline app: find the filter on a recording, undo it, and find the events.
 
     python -m pipeline.app --filter-id-model FILE --event-model FILE --out DIR clip.wav [more.wav ...]
 
-For each mono 192 kHz WAV file, the app does three steps in order. The filter ID
+For each mono 48 kHz WAV file, the app does three steps in order. The filter ID
 model guesses the filter, the compensation filter undoes that guess, and the
 event model finds the events in the undone (compensated) audio. Then the app
 writes a report and the compensated WAV to --out, and prints a short summary of
@@ -52,7 +52,7 @@ import numpy as np
 import soundfile as sf
 
 from pipeline.compensation import compensate
-from pipeline.event_model.features import add_context, frame_features
+from pipeline.event_model.model import clip_features
 from pipeline.event_model.model import load_model as load_event_model
 from pipeline.filter_id.features import spectrum_features
 from pipeline.filter_id.model import FilterIdModel
@@ -142,6 +142,9 @@ def identify_filter(audio, models) -> dict:
 # the settings saved with the event model, because the test compares its events
 # with what python -m pipeline.event_model detect finds in the same file. Reading
 # how detect does it in pipeline/event_model/__main__.py is the quickest way in.
+# Depending on those settings, the features can be our own, the pretrained PANNs
+# model's, or both, and the event model has one function that makes whichever
+# ones its settings ask for, so the app doesn't need to know which.
 def find_events(audio, models) -> list[dict]:
     pass
 
@@ -211,7 +214,7 @@ def describe_filter(spec) -> str:
 # like "rumble 1, hiss 0, transient 2". It takes the events and the types to
 # count, in the order to show them, and lists every type, including the ones with
 # none. The types come from the event model itself (its classes) instead of being
-# written into the app, since the event model is going from 3 types to 7.
+# written into the app, since the event model has 7 types now and may get more.
 def count_events(events, types) -> str:
     pass
 

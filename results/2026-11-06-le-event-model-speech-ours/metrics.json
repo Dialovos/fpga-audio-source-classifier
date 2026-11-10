@@ -1,0 +1,150 @@
+{
+  "train": {
+    "clips": 200,
+    "frames": 200000,
+    "yes_frames": {
+      "rumble": 35552,
+      "hum": 34105,
+      "whine": 34809,
+      "hiss": 38004,
+      "alarm": 37397,
+      "thump": 995,
+      "click": 284
+    }
+  },
+  "tune": {
+    "clips": 40,
+    "frames": 40000,
+    "yes_frames": {
+      "rumble": 7814,
+      "hum": 7177,
+      "whine": 7220,
+      "hiss": 6447,
+      "alarm": 8302,
+      "thump": 183,
+      "click": 67
+    }
+  },
+  "thresholds": {
+    "rumble": 0.55,
+    "hum": 0.65,
+    "whine": 0.3,
+    "hiss": 0.25,
+    "alarm": 0.6,
+    "thump": 0.45,
+    "click": 0.1
+  },
+  "tune_scores": {
+    "counts": {
+      "rumble": {
+        "tp": 41,
+        "fp": 2,
+        "fn": 1
+      },
+      "hum": {
+        "tp": 32,
+        "fp": 10,
+        "fn": 9
+      },
+      "whine": {
+        "tp": 39,
+        "fp": 9,
+        "fn": 1
+      },
+      "hiss": {
+        "tp": 38,
+        "fp": 1,
+        "fn": 1
+      },
+      "alarm": {
+        "tp": 36,
+        "fp": 9,
+        "fn": 12
+      },
+      "thump": {
+        "tp": 20,
+        "fp": 4,
+        "fn": 16
+      },
+      "click": {
+        "tp": 41,
+        "fp": 6,
+        "fn": 6
+      }
+    },
+    "scores": {
+      "rumble": {
+        "tp": 41,
+        "fp": 2,
+        "fn": 1,
+        "precision": 0.9534883720930233,
+        "recall": 0.9761904761904762,
+        "f1": 0.9647058823529412
+      },
+      "hum": {
+        "tp": 32,
+        "fp": 10,
+        "fn": 9,
+        "precision": 0.7619047619047619,
+        "recall": 0.7804878048780488,
+        "f1": 0.7710843373493976
+      },
+      "whine": {
+        "tp": 39,
+        "fp": 9,
+        "fn": 1,
+        "precision": 0.8125,
+        "recall": 0.975,
+        "f1": 0.8863636363636364
+      },
+      "hiss": {
+        "tp": 38,
+        "fp": 1,
+        "fn": 1,
+        "precision": 0.9743589743589743,
+        "recall": 0.9743589743589743,
+        "f1": 0.9743589743589743
+      },
+      "alarm": {
+        "tp": 36,
+        "fp": 9,
+        "fn": 12,
+        "precision": 0.8,
+        "recall": 0.75,
+        "f1": 0.7741935483870968
+      },
+      "thump": {
+        "tp": 20,
+        "fp": 4,
+        "fn": 16,
+        "precision": 0.8333333333333334,
+        "recall": 0.5555555555555556,
+        "f1": 0.6666666666666666
+      },
+      "click": {
+        "tp": 41,
+        "fp": 6,
+        "fn": 6,
+        "precision": 0.8723404255319149,
+        "recall": 0.8723404255319149,
+        "f1": 0.8723404255319149
+      },
+      "overall": {
+        "tp": 247,
+        "fp": 41,
+        "fn": 46,
+        "precision": 0.8576388888888888,
+        "recall": 0.8430034129692833,
+        "f1": 0.8502581755593803
+      }
+    }
+  },
+  "seconds": {
+    "backgrounds_and_split": 0.07706899999902816,
+    "clips_and_features": 36.835317199998826,
+    "fit": 831.5172125000026,
+    "tune_and_evaluate": 25.485747899998387,
+    "total": 894.3417937999984
+  },
+  "note": "Tune clips share recordings with train clips. Test scores are only in the comparison."
+}

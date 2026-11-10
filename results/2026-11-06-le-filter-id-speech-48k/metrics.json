@@ -1,0 +1,61 @@
+{
+  "examples": 2600,
+  "type_accuracy": 0.9476923076923077,
+  "type_and_order_accuracy": 0.7838461538461539,
+  "order_accuracy_given_true_type": 0.8288461538461539,
+  "order_accuracy_given_true_type_by_type": {
+    "bandpass": 0.8899082568807339,
+    "highpass": 0.8767281105990783,
+    "lowpass": 0.7186046511627907
+  },
+  "cutoff_error_octaves": {
+    "bandpass_low": {
+      "median": 0.3436121387907951,
+      "p90": 0.9822672654297652
+    },
+    "bandpass_high": {
+      "median": 0.32141037557340624,
+      "p90": 0.9771228312815863
+    },
+    "highpass": {
+      "median": 0.32995587540888915,
+      "p90": 0.9348333793497474
+    },
+    "lowpass": {
+      "median": 0.35288935108293606,
+      "p90": 1.0179709324818265
+    }
+  },
+  "by_noise_stage": {
+    "after_filter": {
+      "examples": 1296,
+      "type_accuracy": 0.9228395061728395,
+      "type_and_order_accuracy": 0.6388888888888888
+    },
+    "before_filter": {
+      "examples": 1304,
+      "type_accuracy": 0.9723926380368099,
+      "type_and_order_accuracy": 0.9279141104294478
+    }
+  },
+  "type_confusion": {
+    "bandpass": {
+      "bandpass": 810,
+      "highpass": 53,
+      "lowpass": 9
+    },
+    "lowpass": {
+      "lowpass": 854,
+      "bandpass": 6
+    },
+    "highpass": {
+      "highpass": 800,
+      "bandpass": 65,
+      "lowpass": 3
+    }
+  },
+  "train_examples": 10400,
+  "train_recordings": 52,
+  "test_recordings": 13,
+  "seconds": 178.4
+}

@@ -5,3 +5,5 @@ matplotlib>=3.8
 scikit-learn>=1.5
 pytest>=8.0
 ipykernel>=6.0
+torch>=2.0
+panns_inference>=0.1.1

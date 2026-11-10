@@ -11,7 +11,13 @@ from __future__ import annotations
 
 import numpy as np
 
-EVENT_TYPES = ("rumble", "hiss", "transient")
+# The event types the model learns, in column order.
+EVENT_TYPES = ("rumble", "hum", "whine", "hiss", "alarm", "thump", "click")
+
+# Short sounds can be shorter than one frame step. Their nearest frame is always
+# a target, every one of their yes frames is kept for training, and they are
+# scored on their start only.
+SHORT_TYPES = ("thump", "click")
 
 # ********************************
 # Frame targets
@@ -19,8 +25,8 @@ EVENT_TYPES = ("rumble", "hiss", "transient")
 
 
 # Returns uint8 frame targets using centers in [start_s, end_s). The nearest
-# frame to a transient's start is also marked, so a click shorter than one frame
-# step still has a target. A tie uses the earlier frame.
+# frame to a short sound's start is also marked, so a click shorter than one
+# frame step still has a target. A tie uses the earlier frame.
 def events_to_frames(events, n_frames, sample_rate, hop, classes) -> np.ndarray:
     targets = np.zeros((n_frames, len(classes)), dtype=np.uint8)
 
@@ -36,7 +42,7 @@ def events_to_frames(events, n_frames, sample_rate, hop, classes) -> np.ndarray:
         end = min(n_frames, int(np.ceil(event["end_s"] * sample_rate / hop)))
         targets[first:end, column] = 1
 
-        if event["type"] == "transient" and n_frames:
+        if event["type"] in SHORT_TYPES and n_frames:
             position = event["start_s"] * sample_rate / hop
             nearest = int(np.ceil(position - 0.5))
             nearest = int(np.clip(nearest, 0, n_frames - 1))

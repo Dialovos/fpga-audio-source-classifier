@@ -38,11 +38,11 @@ python -m pytest pipeline/tests/check_c_filter.py
 
 The easiest way to try everything is `pipeline-walkthrough.ipynb` in the repo root. It takes one sound through the whole pipeline: it filters it, adds noise, has the filter ID model guess the filter, and undoes the filter with the real settings and with the guess. It saves every version as a WAV so you can listen to it in a DAW. Then it trains or loads the event model on the team's voiceovers, plots a test clip, runs the four-version comparison, finds the events in a WAV, and runs the tests.
 
-Open it in VS Code or Jupyter with the `.venv` kernel. Change `pipeline-walkthrough-settings.json` to try a different sound, filter, noise level, or model, then rerun the cells. The notebook's first cell lists what each setting does. The voiceovers go in `data/test-data-prelim/`.
+Open it in VS Code or Jupyter with the `.venv` kernel. Change `pipeline-walkthrough-settings.json` to try a different sound, filter, noise level, or model, then rerun the cells. The notebook's first cell lists what each setting does. The voiceovers go in `data/test-data-prelim-48k/`, as mono 48 kHz WAVs.
 
 ## Filter ID model (first AI layer)
 
-Predict the filter on mono WAV files at the model's sample rate (192 kHz):
+Predict the filter on mono WAV files at the model's sample rate (48 kHz):
 
 ```
 python -m pipeline.filter_id predict --model model.joblib clip.wav
@@ -52,17 +52,27 @@ Each prediction prints as one JSON line with a `spec` (type, family, order, cuto
 
 ## Event model (second AI layer)
 
-The event model finds rumble, hiss, and transients (clicks and knocks) in the audio, and gives each one a start, an end, and a confidence.
+The event model finds 7 kinds of sounds you'd hear in a cockpit, and gives each one a start, an end, and a confidence:
 
-To train it from the command line (takes ~6 minutes):
+- Rumble: low noise below ~150 Hz
+- Hum: a steady low tone with harmonics, 50-400 Hz
+- Whine: a steady high tone, 2-12 kHz
+- Hiss: high noise from 4-8 kHz up to 20 kHz
+- Alarm: a tone at 500 Hz-3 kHz that beeps on and off
+- Thump: a short low knock
+- Click: a short broadband click
+
+It can read our own frame features, a pretrained sound model's (PANNs CNN14, below), or both. The `pretrained` block of `pipeline/event_model/settings.json` picks which.
+
+To train it from the command line:
 
 ```
 python -m pipeline.event_model train --out results/<YYYY-MM-DD>-<your-name>-<short-name>
 ```
 
-It trains on the recordings in `sources.source_dir` of `pipeline/event_model/settings.json`, which is the team's voiceovers in `data/test-data-prelim/` by default, with each noisy copy grouped under its raw file. To use other recordings, point it at a folder of mono 192 kHz WAV files and list any noisy copies in `recording_groups`.
+It trains on the recordings in `sources.source_dir` of `pipeline/event_model/settings.json`, which is the clean speech of the undamaged speakers in `data/adam-good/clean/` by default. The older voiceovers in `data/test-data-prelim/` are 192 kHz and no longer load; `pipeline-walkthrough-settings.json` points at 48 kHz copies of them in `data/test-data-prelim-48k/`. To use other recordings, point it at a folder of mono 48 kHz WAV files and list any noisy copies in `recording_groups`.
 
-To find the events in mono 192 kHz WAV files:
+To find the events in mono 48 kHz WAV files:
 
 ```
 python -m pipeline.event_model detect --model results/<run>/model.joblib clip.wav
@@ -76,7 +86,27 @@ To compare detection on four versions of the same held-out test clips (clean, fi
 python -m pipeline.event_model compare --model results/<run>/model.joblib --filter-id-model <filter-id-model.joblib> --out results/<run>/compare
 ```
 
-It writes the scores to `metrics.json`, one line per test case to `cases.jsonl`, and a few example WAVs to `examples/`. Leave out `--filter-id-model` to skip the AI guess version. The filter gets undone with our Python copy of the C inverse. On Linux, where the C program builds, add `--method c --c-command pipeline/reversable_filters/filter`.
+It writes the scores to `metrics.json`, one line per test case to `cases.jsonl`, and a few example WAVs to `examples/`. Leave out `--filter-id-model` to skip the AI guess version. The filter gets undone with our Python copy of the C inverse. On Linux, where the C program builds, add `--method c --c-command pipeline/reversable_filters/filter`. The C program reads and writes 16-bit PCM, so its undone audio clips at full scale, while the Python copy keeps the peaks.
+
+### The pretrained model (PANNs)
+
+PANNs CNN14 was trained on AudioSet (~2 million clips, 527 sound classes). We use it frozen: it gives a probability for each of its 527 classes every 10 ms, and the event model reads those next to (or instead of) our own features. It hears 50 Hz-14 kHz, so our features still cover below 50 Hz, 14-24 kHz, and the sharp timing of thumps and clicks.
+
+Before turning it on (`"use_panns": true`), get its checkpoint (~330 MB, into `data/models/`, which Git ignores) and AudioSet's label list once:
+
+```
+python -m pipeline.event_model.pretrained download
+```
+
+It runs on an NVIDIA card when PyTorch can use one, and on the CPU when it can't. A WAV has to be at least 0.31 s long for it, and anything longer than about a minute goes through a piece at a time, so a long recording doesn't run out of memory. It also checks that the checkpoint is the file from the download command, since other CNN14 checkpoints load without an error and give different numbers.
+
+The normal test run checks the PANNs code with a stand-in. To check the real model, run this on its own (it needs ~1 GB of memory):
+
+```
+python -m pytest pipeline/tests/check_panns.py
+```
+
+PANNs is by Qiuqiang Kong et al., "PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition" (2020). Its code is MIT-licensed, and the checkpoint is shared on Zenodo under CC BY 4.0.
 
 ## Status
 

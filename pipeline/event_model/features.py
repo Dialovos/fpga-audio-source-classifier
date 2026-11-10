@@ -154,6 +154,21 @@ def band_changes(bands_db, sample_rate, hop) -> np.ndarray:
     return changes
 
 
+# Returns each band's spread (standard deviation) over about 500 ms around a
+# frame. A beeping alarm swings up and down that fast, while a steady whine or
+# hum stays flat. The neighboring frames only reach 30 ms either side.
+def band_spreads(bands_db, sample_rate, hop) -> np.ndarray:
+    half = max(1, round(0.25 * sample_rate / hop))
+    spreads = np.empty_like(bands_db)
+
+    for frame in range(len(bands_db)):
+        first = max(0, frame - half)
+        end = min(len(bands_db), frame + half + 1)
+        spreads[frame] = np.std(bands_db[first:end], axis=0)
+
+    return spreads
+
+
 # Returns differences between neighboring short bands. These describe the
 # spectrum's shape without changing when the whole signal gets louder.
 def band_slopes(bands_db) -> np.ndarray:
@@ -201,11 +216,12 @@ def frame_features(audio, sample_rate, settings) -> tuple[np.ndarray, np.ndarray
     jumps = np.maximum(np.diff(raw_short_db, axis=0), 0)
     flux[1:] = np.sum(jumps, axis=1)
 
-    # Keep the original measurements first, then add general time averages and
-    # changes. Every classifier receives all of these columns.
+    # Keep the original measurements first, then add general time averages,
+    # changes, and spreads. Every classifier receives all of these columns.
     averages = band_averages(short_db, sample_rate, settings["hop"])
     changes = band_changes(short_db, sample_rate, settings["hop"])
     slopes = band_slopes(short_db)
+    spreads = band_spreads(short_db, sample_rate, settings["hop"])
     columns = [
         long_db,
         short_db,
@@ -215,6 +231,7 @@ def frame_features(audio, sample_rate, settings) -> tuple[np.ndarray, np.ndarray
         averages,
         changes,
         slopes,
+        spreads,
     ]
     features = np.column_stack(columns).astype(np.float32)
     times = frame_times(count, sample_rate, settings["hop"])

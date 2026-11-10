@@ -1,6 +1,6 @@
 # Event Model Map
 
-None of the event model is built yet, so this is a suggested starting point, including the file and function names.
+This is how we planned the event model before it was built, including the file and function names. The code in `pipeline/event_model/` may differ in the details.
 
 Blue is built code, green is the shared pipeline, orange is a file or data, and a dashed box isn't built yet. A solid arrow is a call or hand-off, and a dashed arrow is something done ahead of time, like training.
 
@@ -26,7 +26,7 @@ The record doesn't have a field for events yet, so the test data generator has t
 
 ![Detecting](4-detecting.png)
 
-It works on any mono 192 kHz WAV, which is how the evaluation runs it on the filtered and clean versions too. The features have to use the settings saved with the model.
+It works on any mono 48 kHz WAV, which is how the evaluation runs it on the filtered and clean versions too. The features have to use the settings saved with the model.
 
 ## 5. Inside EventModel
 
