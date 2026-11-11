@@ -1,0 +1,321 @@
+{
+  "seed": 4240,
+  "sample_rate": 48000,
+  "clip_seconds": 10.0,
+  "edge_margin_s": 0.25,
+  "bits": 24,
+  "sources": {
+    "source_dir": "data/adam-good/clean",
+    "recording_groups": {}
+  },
+  "split": {
+    "test_recordings": 13,
+    "tune_fraction": 0.25,
+    "guard_seconds": 10.0,
+    "test_recording_ids": [
+      "Speaker3",
+      "Speaker15",
+      "Speaker17",
+      "Speaker23",
+      "Speaker25",
+      "Speaker31",
+      "Speaker32",
+      "Speaker34",
+      "Speaker45",
+      "Speaker52",
+      "Speaker55",
+      "Speaker58",
+      "Speaker65"
+    ]
+  },
+  "clips": {
+    "train_clips": 400,
+    "tune_clips": 40,
+    "train_noise_chance": 0.8,
+    "conditions_per_test_clip": 2,
+    "export_examples": 2,
+    "speech_rms": 0.025,
+    "train_filtered_chance": 0.33,
+    "train_undone_chance": 0.33
+  },
+  "noise": {
+    "snr_db": [
+      20,
+      40
+    ],
+    "stages": [
+      "before_filter",
+      "after_filter"
+    ]
+  },
+  "filters": {
+    "types": [
+      "highpass",
+      "lowpass",
+      "bandpass"
+    ],
+    "orders": {
+      "highpass": [
+        1,
+        2,
+        4
+      ],
+      "lowpass": [
+        1,
+        2,
+        4
+      ],
+      "bandpass": [
+        2,
+        4,
+        8
+      ]
+    },
+    "highpass_cutoff_hz": [
+      80,
+      1000
+    ],
+    "lowpass_cutoff_hz": [
+      2000,
+      16000
+    ],
+    "bandpass_low_hz": [
+      80,
+      1000
+    ],
+    "bandpass_high_hz": [
+      2000,
+      16000
+    ]
+  },
+  "events": {
+    "per_clip": [
+      0,
+      2
+    ],
+    "same_type_gap_s": 0.3,
+    "rumble": {
+      "cutoff_hz": [
+        40,
+        150
+      ],
+      "duration_s": [
+        0.5,
+        3.0
+      ],
+      "fade_s": [
+        0.05,
+        0.2
+      ],
+      "level_db": [
+        -12,
+        0
+      ]
+    },
+    "hum": {
+      "freq_hz": [
+        50,
+        400
+      ],
+      "duration_s": [
+        0.5,
+        3.0
+      ],
+      "fade_s": [
+        0.05,
+        0.2
+      ],
+      "level_db": [
+        -12,
+        0
+      ]
+    },
+    "whine": {
+      "freq_hz": [
+        2000,
+        12000
+      ],
+      "duration_s": [
+        0.5,
+        3.0
+      ],
+      "fade_s": [
+        0.02,
+        0.1
+      ],
+      "level_db": [
+        -18,
+        -6
+      ]
+    },
+    "hiss": {
+      "cutoff_hz": [
+        4000,
+        8000
+      ],
+      "duration_s": [
+        0.5,
+        3.0
+      ],
+      "fade_s": [
+        0.02,
+        0.1
+      ],
+      "level_db": [
+        -24,
+        -6
+      ]
+    },
+    "alarm": {
+      "freq_hz": [
+        500,
+        3000
+      ],
+      "beep_s": [
+        0.1,
+        0.25
+      ],
+      "gap_s": [
+        0.05,
+        0.2
+      ],
+      "duration_s": [
+        1.0,
+        3.0
+      ],
+      "fade_s": [
+        0.005,
+        0.01
+      ],
+      "level_db": [
+        -12,
+        0
+      ]
+    },
+    "thump": {
+      "freq_hz": [
+        80,
+        1000
+      ],
+      "decay_s": [
+        0.005,
+        0.02
+      ],
+      "peak_db": [
+        6,
+        14
+      ]
+    },
+    "click": {
+      "decay_s": [
+        0.0005,
+        0.003
+      ],
+      "peak_db": [
+        6,
+        14
+      ]
+    }
+  },
+  "features": {
+    "hop": 480,
+    "short_window": 1024,
+    "long_window": 4096,
+    "short_bands": 32,
+    "short_min_hz": 200,
+    "short_max_hz": 24000,
+    "long_bands": 8,
+    "long_min_hz": 20,
+    "long_max_hz": 400,
+    "context": 3
+  },
+  "model": {
+    "max_iter": 200,
+    "learning_rate": 0.1,
+    "max_leaf_nodes": 31,
+    "train_frame_step": 4
+  },
+  "decoding": {
+    "rumble": {
+      "smooth_frames": 5,
+      "merge_gap_s": 0.05,
+      "min_duration_s": 0.2
+    },
+    "hum": {
+      "smooth_frames": 5,
+      "merge_gap_s": 0.05,
+      "min_duration_s": 0.2
+    },
+    "whine": {
+      "smooth_frames": 5,
+      "merge_gap_s": 0.05,
+      "min_duration_s": 0.2
+    },
+    "hiss": {
+      "smooth_frames": 5,
+      "merge_gap_s": 0.05,
+      "min_duration_s": 0.2
+    },
+    "alarm": {
+      "smooth_frames": 5,
+      "merge_gap_s": 0.5,
+      "min_duration_s": 0.3
+    },
+    "thump": {
+      "smooth_frames": 1,
+      "merge_gap_s": 0.03,
+      "min_duration_s": 0
+    },
+    "click": {
+      "smooth_frames": 1,
+      "merge_gap_s": 0.03,
+      "min_duration_s": 0
+    },
+    "threshold_grid": [
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9,
+      0.95
+    ]
+  },
+  "scoring": {
+    "onset_collar_s": {
+      "rumble": 0.2,
+      "hum": 0.2,
+      "whine": 0.2,
+      "hiss": 0.2,
+      "alarm": 0.2,
+      "thump": 0.05,
+      "click": 0.05
+    },
+    "offset_collar_s": 0.2,
+    "offset_fraction": 0.2,
+    "offset_types": [
+      "rumble",
+      "hum",
+      "whine",
+      "hiss",
+      "alarm"
+    ]
+  },
+  "pretrained": {
+    "use_ours": true,
+    "use_panns": false,
+    "checkpoint": "data/models/Cnn14_DecisionLevelMax_mAP=0.385.pth"
+  }
+}

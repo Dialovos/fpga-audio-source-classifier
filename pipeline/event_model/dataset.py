@@ -14,9 +14,11 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+from pipeline.compensation import compensate
 from pipeline.degrade import add_noise, quantize
 from pipeline.event_model import events
 from pipeline.event_model.labels import SHORT_TYPES, event_order
+from pipeline.event_model.settings import clip_setting
 from pipeline.event_model.sources import render_background
 from pipeline.filter_id.dataset import sample_filter
 from pipeline.filters import apply_filter
@@ -213,7 +215,7 @@ def _clean_clip(split_name, index, recordings, split, settings, rng):
     if rms == 0:
         raise ValueError("background clip is silent")
 
-    gain = float(0.1 / rms)
+    gain = float(clip_setting(settings, "speech_rms") / rms)
     audio *= gain
     labels, dropped = _mix_events(audio, settings, rng)
 
@@ -251,8 +253,70 @@ def make_clip(split_name, index, recordings, split, settings) -> tuple[np.ndarra
 # ********************************
 
 
-# Returns a train or tune clip with optional white noise and one rounding step.
-# It stops with a ValueError for another split or an invalid background clip.
+# Returns which version of itself a train or tune clip becomes: "clean",
+# "filtered", or "undone" (filtered, then undone with the true filter). The two
+# chances come from the optional clip settings and clean gets the rest. Nothing
+# is drawn when both chances are 0, so a clean-only run keeps the clips it
+# always had.
+def _pick_version(settings, rng) -> str:
+    filtered = clip_setting(settings, "train_filtered_chance")
+    undone = clip_setting(settings, "train_undone_chance")
+
+    if filtered == 0 and undone == 0:
+        return "clean"
+
+    draw = rng.random()
+
+    if draw < filtered:
+        return "filtered"
+
+    if draw < filtered + undone:
+        return "undone"
+
+    return "clean"
+
+
+# Returns a clean clip after a random filter, made the way a test case is: the
+# noise goes in before or after the filter, then there is one rounding step.
+# An "undone" clip then has that filter undone by our Python copy of the
+# inverse, using the true filter settings. The record keeps the version, the
+# filter, the noise, the rounding, and the undo. It stops with a ValueError if
+# the filter or the undo fails.
+def _filtered_clip(audio, record, version, settings, rng) -> tuple[np.ndarray, dict]:
+    sample_rate = settings["sample_rate"]
+    spec = sample_filter(settings["filters"], rng)
+    stages = settings["noise"]["stages"]
+    stage = stages[int(rng.integers(len(stages)))]
+    power = float(np.mean(audio**2))
+    noisy = rng.random() < settings["clips"]["train_noise_chance"]
+    snr = float(rng.uniform(*settings["noise"]["snr_db"]))
+
+    if noisy and stage == "before_filter":
+        audio, step = add_noise(audio, snr, rng, stage=stage, reference_power=power)
+        record["damage"].append(step)
+
+    audio, record["filter"] = apply_filter(audio, sample_rate, spec)
+
+    if noisy and stage == "after_filter":
+        audio, step = add_noise(audio, snr, rng, stage=stage, reference_power=power)
+        record["damage"].append(step)
+
+    audio, rounding = quantize(audio, bits=settings["bits"], stage="after_filter")
+    record["damage"].append(rounding)
+
+    if version == "undone":
+        audio, record["compensation"] = compensate(audio, sample_rate, spec)
+
+    record["clip"]["version"] = version
+
+    return audio, record
+
+
+# Returns a train or tune clip and its record. A clean clip gets optional white
+# noise and one rounding step. The optional clip settings can first move its
+# level by a random number of dB, and can turn it into a filtered or undone
+# clip. It stops with a ValueError for another split or an invalid background
+# clip.
 def make_labeled_clip(split_name, index, recordings, split, settings) -> tuple[np.ndarray, dict]:
     if split_name not in ("train", "tune"):
         raise ValueError("split_name must be train or tune for make_labeled_clip")
@@ -262,6 +326,20 @@ def make_labeled_clip(split_name, index, recordings, split, settings) -> tuple[n
 
     # Continue after making the events. Restarting the generator here would
     # reuse random draws from event synthesis for the background noise.
+    low, high = clip_setting(settings, "train_level_db")
+
+    if low != 0 or high != 0:
+        # Move the whole clip, speech and events together, before any noise,
+        # filter or rounding, as if it had been recorded louder or quieter.
+        level_db = float(rng.uniform(low, high))
+        audio *= 10 ** (level_db / 20)
+        record["clip"]["level_db"] = level_db
+
+    version = _pick_version(settings, rng)
+
+    if version != "clean":
+        return _filtered_clip(audio, record, version, settings, rng)
+
     if rng.random() < settings["clips"]["train_noise_chance"]:
         snr = float(rng.uniform(*settings["noise"]["snr_db"]))
         power = float(np.mean(audio**2))

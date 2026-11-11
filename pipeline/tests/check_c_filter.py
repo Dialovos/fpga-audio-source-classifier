@@ -261,6 +261,22 @@ def test_undo_matches_python(program, tmp_path):
             assert_close(c_output, python_output, f"undo {kind} order {order}")
 
 
+# Tests: undoing a low-pass (option 4) or a high-pass (option 5) gives the same output with 0 in the cutoff it
+#   doesn't use as with a real number there.
+# Why: pipeline/compensation.py sends 0 for the cutoff a filter doesn't have. A check on the arguments can't
+#   refuse that, and the unused number can't change the result.
+def test_unused_cutoff_can_be_zero(program, tmp_path):
+    low_passed = to_16_bit(signal.sosfilt(butterworth("LP", 2), noise()))
+    usual = run_program(program, tmp_path / "low-pass", low_passed, "LP", 2, 4)
+    with_zero = run_program(program, tmp_path / "low-pass-zero", low_passed, "LP", 2, 4, highpass_hz=0)
+    np.testing.assert_array_equal(with_zero, usual)
+
+    high_passed = to_16_bit(signal.sosfilt(butterworth("HP", 2), noise()))
+    usual = run_program(program, tmp_path / "high-pass", high_passed, "HP", 2, 5)
+    with_zero = run_program(program, tmp_path / "high-pass-zero", high_passed, "HP", 2, 5, lowpass_hz=0)
+    np.testing.assert_array_equal(with_zero, usual)
+
+
 # Tests: a filter family other than butter stops the program with an error code, without writing out.wav.
 # Why: the program only knows Butterworth filters. Anything else has to fail loudly, not leave an output that looks
 #   like it worked.

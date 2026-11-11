@@ -14,6 +14,36 @@ Results folder: results/<YYYY-MM-DD>-<your-name>-<short-name>/ (if any)
 Next:
 ```
 
+## 2026-11-10 - quick runs on how we train the event model (Le)
+
+What I tried: I ran 4 short runs before the long final ones, to see what's worth running. For each one I set 13 of the 52 train speakers aside, trained on the rest, and scored on those 13, so the 13 test speakers never got touched. I cut the settings down so they'd finish fast (100 rounds, one seed, 150 check clips), so these are rough numbers, not results.
+1. Features: ours, PANNs' 527 probabilities, PANNs' 2,048 inner features, and ours + the probabilities.
+2. More clips with fewer frames from each, so training takes the same time.
+3. Training at different loudness levels, with each clip 0 to 30 dB quieter.
+4. Training on clean, filtered & undone clips, a third of each.
+
+Why: The PANNs runs and the comparison take hours, so I wanted to know if they're worth it first. Runs 3 & 4 are for two gaps with the plan: the app gets recordings at any level, and the detector never trains on filtered or undone audio.
+
+What happened:
+- PANNs doesn't help. Overall F1 was 0.79 with our features, 0.16 with its probabilities, 0.19 with its inner features, and 0.75 with ours + the probabilities (alarm dropped from 0.85 to 0.66). It does hear the long sounds. Scored frame by frame with the timing left out (area under the ROC curve), it got 0.86-0.98 on rumble, hum, whine, hiss & alarm, against 0.98-1.00 for ours. But it only got 0.65 on thump and 0.52 on click, and it only updates every 0.32 s, which is wider than our 0.2 s timing rule.
+- Twice the clips in the same training time helps. 160 clips at every 4th frame got 0.79 with 276 false alarms, 320 at every 8th got 0.82 with 191, and 480 at every 12th got 0.82 with 255. Click went from 0.72 to 0.82.
+- The level gap is real, and neither fix is free. Overall F1, with 320 clips at every 8th frame:
+
+| Trained on | Clean | 15 dB quieter | 30 dB quieter | Filtered | Undone |
+| --- | --- | --- | --- | --- | --- |
+| Clean, one level (how we train now) | 0.82 | 0.70 | 0.62 | 0.55 | 0.60 |
+| Clean, different levels | 0.76 | 0.78 | 0.80 | 0.50 | 0.55 |
+| Clean, filtered & undone | 0.79 | 0.68 | 0.49 | 0.63 | 0.64 |
+| Both | 0.77 | 0.77 | 0.77 | 0.59 | 0.59 |
+
+- At one level, rumble falls from 0.95 to 0.10 when the same audio is 30 dB quieter. Training at different levels fixes that, but it costs ~0.05 everywhere else.
+- Training on filtered & undone clips helps those two versions and costs 0.03 on clean. It also leaves undoing with almost no edge over not undoing (0.64 against 0.63).
+- Speech level: at RMS 0.1, 74.7% of the undone clips in the Nov 6 run went past full scale, and the C program's 16-bit output clips those. At RMS 0.05 it'd be 1.1% (4.8% with filter ID's guess), and at RMS 0.025 it's 0.00% (0.07%). So the final runs use RMS 0.025.
+
+Results folder: none. These were scratch scripts, so the numbers are only here and in the commit messages.
+
+Next: Run the 4 settings files in run-settings/ (README, "The final runs"): ours, ours trained on clean, filtered & undone clips, ours + PANNs, and ours at different levels for the app. They all use 400 clips at every 4th frame and speech at RMS 0.025. The speech level, the different levels, and the filtered & undone clips are optional clip settings, so the default settings and the saved runs didn't change. Still open: the alarm test, and the rounding is still 24-bit while the files and the C program are 16-bit.
+
 ## 2026-11-06 - filter ID and event model at 48 kHz on Adam's speech (Le)
 
 What I tried: I moved the pipeline from 192 kHz to 48 kHz, since Adam's exports and his filter PR (#29) are both 48 kHz. Hop and windows scaled so each frame covers the same time as before (hop 480, short window 1024, long window 4096, filter ID segment 8192). Then I ran both models on the clean speech of the 65 undamaged speakers from Adam's USB. Filter ID trained on real speech for the first time (52 speakers, 200 1 s examples each). The event model used our own features with 200 train and 40 tune clips. Both held out the same 13 speakers, so neither model heard the test voices. The events, filters and noise are still synthetic, mixed onto the real speech.
