@@ -178,6 +178,19 @@ def test_settings_require_every_field():
             check_settings(changed)
 
 
+# Tests: every settings file in run-settings/ passes the settings check.
+# Why: a teammate starts the long final runs from these files on another
+# computer, so a bad one should fail here and not hours into a run.
+def test_run_settings_files_pass_the_check():
+    folder = Path(__file__).parents[2] / "run-settings"
+    paths = sorted(folder.glob("*.json"))
+
+    assert paths
+
+    for path in paths:
+        check_settings(json.loads(path.read_text(encoding="utf-8")))
+
+
 # Tests: bad rates, ranges, counts, smoothing and types stop with their setting
 # names.
 # Why: malformed values must not turn into obscure errors halfway through a run.

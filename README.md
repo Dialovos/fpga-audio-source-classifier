@@ -96,6 +96,24 @@ python -m pipeline.event_model compare --model results/<run>/model.joblib --filt
 
 It writes the scores to `metrics.json`, one line per test case to `cases.jsonl`, and a few example WAVs to `examples/`. Leave out `--filter-id-model` to skip the AI guess version. The filter gets undone with our Python copy of the C inverse. On Linux, where the C program builds, add `--method c --c-command pipeline/reversable_filters/filter`. The C program reads and writes 16-bit PCM, so its undone audio clips at full scale, while the Python copy keeps the peaks.
 
+### The final runs
+
+The settings for the final event model runs are in `run-settings/`. All four use the 65 clean speech recordings, the same 13 held-out speakers as the saved Nov 6 run, 400 training clips, and speech scaled to RMS 0.025 so the undone audio fits in 16-bit:
+
+- `event-model-speech-ours.json`: our features, trained on clean clips. This is the main comparison.
+- `event-model-speech-mixed.json`: the same, trained on clean, filtered and undone clips in thirds. This is the extra comparison.
+- `event-model-speech-both.json`: our features and PANNs together.
+- `event-model-speech-levels.json`: our features, trained at varied levels. It is for the app, which gets recordings at any level.
+
+Train each one on the saved split, then compare it. For the first one:
+
+```
+python -m pipeline.event_model train --settings run-settings/event-model-speech-ours.json --split results/2026-11-06-le-event-model-speech-ours/split.json --out results/<YYYY-MM-DD>-<your-name>-event-model-speech-ours
+python -m pipeline.event_model compare --model results/<YYYY-MM-DD>-<your-name>-event-model-speech-ours/model.joblib --filter-id-model results/2026-11-06-le-filter-id-speech-48k/model.joblib --out results/<YYYY-MM-DD>-<your-name>-event-model-speech-ours/compare
+```
+
+The speech recordings (`data/adam-good/clean/`) and the filter ID model (`results/2026-11-06-le-filter-id-speech-48k/model.joblib`) are not in Git, so ask Le for them. The side runs behind these settings are in the Nov 10 entry of `docs/experiment-log.md`.
+
 ### The pretrained model (PANNs)
 
 PANNs CNN14 was trained on AudioSet (~2 million clips, 527 sound classes). We use it frozen: it gives a probability for each of its 527 classes every 10 ms, and the event model reads those next to (or instead of) our own features. It hears 50 Hz-14 kHz, so our features still cover below 50 Hz, 14-24 kHz, and the sharp timing of thumps and clicks.

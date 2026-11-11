@@ -14,6 +14,36 @@ Results folder: results/<YYYY-MM-DD>-<your-name>-<short-name>/ (if any)
 Next:
 ```
 
+## 2026-11-10 - side runs on how we train the event model (Le)
+
+What I tried: Four short runs before the long final ones. Each held 13 of the 52 train speakers out of fitting and scored on them, so the 13 test speakers stayed untouched. The settings were cut down to finish fast (100 rounds, one seed, 150 check clips), so these are rough numbers, not results.
+1. Features: ours, PANNs' 527 probabilities, PANNs' 2,048 inner features, and ours with the probabilities.
+2. More clips with fewer frames from each, so the training time stayed the same.
+3. Training at varied levels, each clip 0 to 30 dB quieter.
+4. Training on clean, filtered and undone clips in thirds.
+
+Why: The PANNs runs and the comparison take hours, so we wanted to know if they were worth it first. Runs 3 and 4 are for two gaps with the plan: the app gets recordings at any level, and the detector never trains on filtered or undone audio.
+
+What happened:
+- PANNs doesn't help. Overall F1 was 0.79 with our features, 0.16 with its probabilities, 0.19 with its inner features, and 0.75 with ours and the probabilities together (alarm dropped from 0.85 to 0.66). It does hear the long sounds: scored frame by frame with timing left out (area under the ROC curve), it got 0.86-0.98 on rumble, hum, whine, hiss and alarm, against 0.98-1.00 for ours. But it got 0.65 on thump and 0.52 on click, and its 0.32 s step is wider than our 0.2 s timing rule.
+- Twice the clips at the same training time helps. 160 clips at every 4th frame got 0.79 with 276 false alarms, 320 at every 8th got 0.82 with 191, and 480 at every 12th got 0.82 with 255. Click went from 0.72 to 0.82.
+- The level gap is real, and neither fix is free. Overall F1, with 320 clips at every 8th frame:
+
+| Trained on | Clean | 15 dB quieter | 30 dB quieter | Filtered | Undone |
+| --- | --- | --- | --- | --- | --- |
+| Clean, one level (how we train now) | 0.82 | 0.70 | 0.62 | 0.55 | 0.60 |
+| Clean, varied levels | 0.76 | 0.78 | 0.80 | 0.50 | 0.55 |
+| Clean, filtered and undone | 0.79 | 0.68 | 0.49 | 0.63 | 0.64 |
+| Both | 0.77 | 0.77 | 0.77 | 0.59 | 0.59 |
+
+- At one level, rumble falls from 0.95 to 0.10 when the same audio is 30 dB quieter. Varied levels fix that and cost about 0.05 everywhere else.
+- Training on filtered and undone clips helps those versions and costs 0.03 on clean. It also leaves undoing almost no edge over not undoing (0.64 against 0.63).
+- Speech level: at RMS 0.1, 74.7% of the undone clips in the Nov 6 run went past full scale, which the C program's 16-bit output clips. At RMS 0.05 it would be 1.1% (4.8% with filter ID's guess), and at RMS 0.025 it is 0.00% (0.07%). So the final runs use RMS 0.025.
+
+Results folder: none. The runs were scratch scripts, and the numbers are here and in the commit messages.
+
+Next: Run the four settings files in run-settings/ (README, "The final runs"): ours, ours trained on clean, filtered and undone clips, ours with PANNs, and ours at varied levels for the app. All use 400 clips at every 4th frame and speech at RMS 0.025. The speech level, the varied levels, and the filtered and undone clips are optional clip settings, so the default settings and the saved runs didn't change. Still open: the alarm test, and rounding is still 24-bit while the files and the C program are 16-bit.
+
 ## 2026-11-06 - filter ID and event model at 48 kHz on Adam's speech (Le)
 
 What I tried: I moved the pipeline from 192 kHz to 48 kHz, since Adam's exports and his filter PR (#29) are both 48 kHz. Hop and windows scaled so each frame covers the same time as before (hop 480, short window 1024, long window 4096, filter ID segment 8192). Then I ran both models on the clean speech of the 65 undamaged speakers from Adam's USB. Filter ID trained on real speech for the first time (52 speakers, 200 1 s examples each). The event model used our own features with 200 train and 40 tune clips. Both held out the same 13 speakers, so neither model heard the test voices. The events, filters and noise are still synthetic, mixed onto the real speech.
