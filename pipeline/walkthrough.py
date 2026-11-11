@@ -1,8 +1,9 @@
 """
 Walk through every part of the pipeline from short notebook cells.
 
-pipeline-walkthrough.ipynb in the repo root calls these functions, and
-pipeline-walkthrough-settings.json holds the settings it reads.
+pipeline/notebooks/pipeline-walkthrough.ipynb calls these functions, and
+pipeline-walkthrough-settings.json in the repo root holds the settings it
+reads.
 
 This file has six groups:
     * Settings
