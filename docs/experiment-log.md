@@ -26,8 +26,8 @@ What happened:
 - Noise after the filter is still the hard case. Type + order is 0.947 with the noise before the filter & 0.683 with it after.
 - It's a little better than the 65-speaker run on Nov 6 (0.948, 0.784, 0.829). The test speakers aren't the same ones though, so it isn't an exact comparison.
 - Two runs from the same settings & files give identical scores. There's a test for that now.
-- The event model, the notebook, the final-run settings & the diagrams moved to the archive/event-model branch. John is writing layer 2, so the older entries below about the event model describe code that now lives on that branch.
-- The offline app is out of scope now. The team decided not to build it, so its blank spec & its tests went to the archive branch too. The older entries below that mention the app are from before that.
+- The event model, the notebook, the final-run settings & the diagrams came out of the current files. They're still in the repo's history at commit 027029a, the last one before the cut. John is writing layer 2, so the older entries below about the event model describe code that's only in that older commit now.
+- The offline app is out of scope now. The team decided not to build it, so its blank spec & its tests came out too. The older entries below that mention the app are from before that.
 
 Results folder: results/2026-11-12-le-filter-id-speech-109/ (metrics.json and settings.json; the model stays out of Git)
 
