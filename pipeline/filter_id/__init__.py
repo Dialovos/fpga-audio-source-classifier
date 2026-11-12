@@ -1,9 +1,8 @@
 """
-The filter ID model (the first AI layer).
+Layer 1: the filter ID model (the first AI layer).
 
-It looks at a filtered clip and predicts the filter that was applied: the type
-(high-pass, low-pass, or band-pass), the order, and the cutoffs. Each prediction
-comes with a filter spec the compensation filter can use to undo it.
+It looks at a filtered clip & works out the filter that was applied: the type (high-pass, low-pass, or band-pass), the
+order & the cutoffs. Every answer comes as a filter spec that the inverse filter can use to undo it.
 
     python -m pipeline.filter_id predict --model model.joblib clip.wav
 """

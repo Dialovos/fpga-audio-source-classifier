@@ -1,13 +1,12 @@
 """
-Command line for the filter ID model.
+The command line for layer 1 (the filter ID model).
 
     python -m pipeline.filter_id train --out results/<YYYY-MM-DD>-<your-name>-<short-name>
     python -m pipeline.filter_id predict --model results/<run>/model.joblib clip.wav [more.wav ...]
 
-train builds the examples from the WAV files in the settings' "source_dir", holds
-out whole recordings for testing, trains, and writes model.joblib, metrics.json,
-and settings.json to --out. predict prints one JSON line per WAV file with the
-predicted filter.
+train makes the practice examples from the WAV files in the settings' "source_dir", sets whole recordings aside for
+testing, trains, and writes model.joblib, metrics.json & settings.json to --out. predict prints 1 JSON line per WAV file
+with the filter it thinks was applied.
 
 This file has three groups:
     * Training
@@ -38,7 +37,7 @@ from pipeline.filter_id.model import (
 )
 from pipeline.records import load_settings
 
-# The settings train uses when --settings isn't given.
+# The settings file train uses when you don't pass --settings.
 DEFAULT_SETTINGS = Path(__file__).with_name("settings.json")
 
 # ********************************
@@ -51,11 +50,9 @@ def _print_progress(done: int, total: int) -> None:
     print(f"built {done}/{total} examples", flush=True)
 
 
-# Runs the train command: it builds the examples, trains on most of the
-# recordings, scores on the ones it held out, and saves the model, the settings,
-# and the scores to a new folder. It stops with a message if the folder already
-# exists, so an earlier run never gets overwritten, or if the settings or the WAV
-# files are bad.
+# Runs the train command. It makes the examples, trains on most of the recordings, scores on the ones it set aside, and
+# saves the model, the settings & the scores to a new folder. If the folder already exists it stops with a message, so
+# an old run never gets overwritten. It also stops with a message if the settings or the WAV files are bad.
 def train(args) -> None:
     settings = load_settings(args.settings)
     out = Path(args.out)
@@ -80,8 +77,8 @@ def train(args) -> None:
     test_records = _pick_rows(data.records, test_rows)
     metrics = evaluate(model, data.features[test_rows], test_labels, test_records)
 
-    # Add a few counts so the scores are easy to put in context, and the held-out
-    # recordings so two machines can check they tested on the same ones.
+    # Add a few counts so the scores are easy to put in context, and the held-out recordings so two machines can check
+    # they tested on the same ones.
     test_recordings = sorted(set(data.groups[test_rows].tolist()))
     metrics["train_examples"] = len(train_rows)
     metrics["train_recordings"] = len(set(data.groups[train_rows].tolist()))
@@ -103,8 +100,7 @@ def train(args) -> None:
 # ********************************
 
 
-# Reads a WAV file. It stops with a message if the file isn't mono or isn't at
-# the model's sample rate.
+# Reads a WAV file. It stops with a message if the file isn't mono or isn't at the sample rate the model was trained on.
 def _read_mono_wav(path: str, sample_rate: int) -> np.ndarray:
     audio, rate = sf.read(path, dtype="float64")
 
@@ -117,8 +113,7 @@ def _read_mono_wav(path: str, sample_rate: int) -> np.ndarray:
     return audio
 
 
-# Runs the predict command: it prints one JSON line with the predicted filter for
-# each WAV file.
+# Runs the predict command. It prints 1 JSON line per WAV file with the filter the model thinks was applied.
 def predict(args) -> None:
     model, settings = load_model(args.model)
 
@@ -137,7 +132,7 @@ def predict(args) -> None:
 # ********************************
 
 
-# Returns the parser that reads the train and predict commands and their options.
+# Sets up the 2 commands (train & predict) & the options each one takes.
 def _build_parser() -> argparse.ArgumentParser:
     description = __doc__.strip().split("\n\n")[0]
     parser = argparse.ArgumentParser(prog="python -m pipeline.filter_id", description=description)
@@ -156,7 +151,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# Reads the command line and runs the chosen command.
+# Reads the command line & runs the command that was asked for.
 def main(argv=None) -> None:
     args = _build_parser().parse_args(argv)
     args.run(args)

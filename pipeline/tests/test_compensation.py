@@ -141,8 +141,8 @@ def test_inverse_does_not_clip_and_checks_settings():
 # ********************************
 
 
-# Returns a fake C command and its log path after writing the script. The log
-# stays outside the program's temporary folder so it can be checked afterward.
+# Returns a fake C command and its log path after writing the script. The log stays outside the program's temporary
+# folder so it can be checked afterward.
 def fake_filter(tmp_path, mode="copy"):
     script = tmp_path / f"fake_{mode}.py"
     log = tmp_path / f"arguments_{mode}.json"

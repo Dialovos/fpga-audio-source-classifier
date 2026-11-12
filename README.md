@@ -2,7 +2,7 @@
 
 CSC 4240 team project. A recording goes through an unknown filter that cuts out part of the sound, and our system tries to get it back in 3 parts. Layer 1 is an AI model that looks at the filtered recording & figures out which filter it went through. The inverse filter is DSP written in C, and it uses that answer to bring back what the filter turned down. Layer 2 is a second AI model that finds the sound events that were buried.
 
-Right now this repo has layer 1 (`pipeline/filter_id/`) and the inverse filter (`pipeline/reversable_filters/`, with a Python copy of it in `pipeline/compensation.py`). Layer 2 is being written. The earlier version of layer 2, the offline app, the notebook & the diagrams are on the `archive/event-model` branch if you need them. Our notes on what we tried & what happened are in `docs/experiment-log.md`.
+Right now this repo has layer 1 (`pipeline/filter_id/`) and the inverse filter (`pipeline/reversable_filters/`, with a Python copy of it in `pipeline/compensation.py`). Layer 2 is being written. The earlier version of layer 2, the notebook & the diagrams are on the `archive/event-model` branch if you need them. Our first plan also had an offline app that tied the 3 parts into one command. The team dropped it, so it isn't part of the project anymore. Our notes on what we tried & what happened are in `docs/experiment-log.md`.
 
 ## All the commands, in order
 

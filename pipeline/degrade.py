@@ -1,11 +1,10 @@
 """
-Realistic damage: added noise and rounding to a bit depth.
+Makes clean audio more like a real recording: adds noise & rounds it to a bit depth.
 
-Both are settings, not fixed steps. The proposal adds noise at several SNRs and
-tests it both before and after the filter, so every step takes a stage
-("before_filter" or "after_filter") and puts it in its record. The generator
-decides the order. Each function returns (audio, record) so the example's record
-says exactly what was done and where.
+Both are settings, not fixed steps. Our proposal adds noise at several SNRs (how many dB louder the audio is than the
+noise) & tests it both before and after the filter. So every step takes a stage ("before_filter" or "after_filter") &
+writes it into its record. The code that builds the examples decides the order. Each function gives back (audio,
+record), so the example's record says exactly what was done & where.
 
 This file has three groups:
     * Shared checks
@@ -30,8 +29,7 @@ MAX_BITS = 32
 # ********************************
 
 
-# Returns the audio as a numpy array of decimal numbers, or stops if it isn't
-# mono.
+# Gives back the audio as a numpy array of decimal numbers, or stops if it isn't mono (1 channel).
 def _mono(audio) -> np.ndarray:
     samples = np.asarray(audio, dtype=np.float64)
 
@@ -47,17 +45,16 @@ def _check_stage(stage: str) -> None:
         raise ValueError(f"stage must be one of {STAGES}, got {stage!r}")
 
 
-# Stops unless rng is a numpy random generator. A plain seed number isn't
-# allowed.
+# Stops unless rng is a numpy random generator. A plain seed number isn't allowed.
 def _check_rng(rng) -> None:
     if not isinstance(rng, np.random.Generator):
         raise TypeError("rng must be a numpy Generator, for example np.random.default_rng(seed)")
 
 
-# Returns the bit depth as a whole number, or stops unless it's from 2 to 32.
+# Gives back the bit depth as a whole number, or stops unless it's from 2 to 32.
 def _check_bits(bits) -> int:
-    # Python treats True as the number 1, so True and False are ruled out on purpose.
-    # 24.0 is ruled out too, since it's probably a typo.
+    # Python treats True as the number 1, so True and False are ruled out on purpose. 24.0 is ruled out too, since it's
+    # probably a typo.
     is_whole_number = isinstance(bits, Integral) and not isinstance(bits, bool)
 
     if not is_whole_number or not MIN_BITS <= bits <= MAX_BITS:
@@ -71,9 +68,10 @@ def _check_bits(bits) -> int:
 # ********************************
 
 
-# Returns noisy audio and its record, using the input power or reference_power.
-# It stops with a ValueError for an invalid reference, silent input without a
-# reference, non-mono audio, or an unknown stage. A wrong rng raises TypeError.
+# Adds white noise to the audio at a chosen SNR (how many dB louder the audio is than the noise). Normally the noise
+# level is set against the audio you pass in. If you pass reference_power, it's set against that level instead. It gives
+# back the noisy audio & a record of what was added. It stops with a ValueError for a bad reference, for silent audio
+# with no reference, for audio that isn't mono, or for an unknown stage. A wrong rng raises a TypeError.
 def add_noise(
     audio, snr_db: float, rng: np.random.Generator, *, stage: str, reference_power=None
 ) -> tuple[np.ndarray, dict]:
@@ -98,8 +96,8 @@ def add_noise(
     # An SNR of X dB means the noise power is the signal power divided by 10^(X/10).
     noise_rms = np.sqrt(signal_power / 10 ** (snr_db / 10))
 
-    # Make random noise, then scale it so its level is exactly noise_rms
-    # (random noise is only close to the right level on its own).
+    # Make random noise, then scale it so its level is exactly noise_rms (random noise is only close to the right level
+    # on its own).
     noise = rng.standard_normal(len(samples))
     actual_rms = np.sqrt(np.mean(noise**2))
     noise *= noise_rms / actual_rms
@@ -124,15 +122,12 @@ def add_noise(
 # ********************************
 
 
-# Rounds the audio like a recorder's converter, and clips anything too loud. A
-# 24-bit converter can only store whole numbers ("codes") from -2^23 up to 2^23
-# - 1, and each code is one "step" of level, where step = full_scale / 2^(bits -
-# 1). This rounds every sample to the nearest step and clips anything outside
-# the converter's range. The result stays in decimal numbers so later steps can
-# use it. The default is 24-bit, like the proposal's recordings. It returns the
-# rounded audio and a record with the bit depth, stage, step size, and how many
-# samples had to be clipped. It stops with a ValueError if bits, full_scale, or
-# the stage is bad, or if the audio isn't mono.
+# Rounds the audio the way a recorder's converter would, and clips anything that's too loud. A 24-bit converter can only
+# store whole numbers ("codes") from -2^23 up to 2^23 - 1, and each code is 1 "step" of level, where step = full_scale /
+# 2^(bits - 1). This rounds every sample to the nearest step & clips anything outside the converter's range. The result
+# stays in decimal numbers so later steps can use it. It gives back the rounded audio & a record with the bit depth, the
+# stage, the step size & how many samples had to be clipped. It stops with a ValueError if bits, full_scale, or the
+# stage is bad, or if the audio isn't mono.
 def quantize(audio, bits: int = 24, full_scale: float = 1.0, *, stage: str) -> tuple[np.ndarray, dict]:
     bits = _check_bits(bits)
 

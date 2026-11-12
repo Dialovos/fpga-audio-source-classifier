@@ -1,18 +1,16 @@
 """
-Settings files, seeds, and per-example records.
+Settings files, seeds & the record we keep for every example.
 
-Every generated example saves its own record: the exact filter settings, the
-sources it used, their levels, the damage applied, and its seed. A seed alone
-can't rebuild an example once the code or the source files change, so the
-record keeps the actual values too.
+Every example we make saves its own record: the exact filter settings, the sources it used, their levels, the damage
+that was applied (noise & rounding) & its seed. A seed by itself can't rebuild an example once the code or the source
+files change, so the record keeps the real values too.
 
-Every source has to name the recording it came from ("recording_id"), because
-we hold out whole source recordings for testing. Synthetic sounds get an ID
-too, like "synthetic-tone-100hz". The rest of each source dict is up to the
-test data method.
+Every source has to name the recording it came from ("recording_id"), since we set whole recordings aside for testing.
+Synthetic sounds get an ID too, like "synthetic-tone-100hz". The rest of each source dict is up to whatever makes the
+test data.
 
-Damage steps go in the order they were applied, and each one says whether it
-happened before or after the filter, since the proposal tests noise both ways.
+Damage steps go in the order they were applied, and each one says if it happened before or after the filter, since our
+proposal tests noise both ways.
 
 This file has three groups:
     * Settings and seeds
@@ -30,7 +28,7 @@ import numpy as np
 
 from pipeline.degrade import STAGES
 
-# Bump this if the record layout changes, so old and new records can be told apart.
+# The version of the record layout. Bump it if the layout changes, so old & new records can be told apart.
 SCHEMA_VERSION = 2
 
 
@@ -39,17 +37,15 @@ SCHEMA_VERSION = 2
 # ********************************
 
 
-# Reads a JSON settings file and returns it as a dict. It stops with a
-# ValueError if there's no "seed", or if the seed isn't a whole number 0 or
-# above.
+# Reads a JSON settings file & gives it back as a dict. It stops with a ValueError if there's no "seed", or if the seed
+# isn't a whole number that's 0 or above.
 def load_settings(path) -> dict:
     text = Path(path).read_text(encoding="utf-8")
     settings = json.loads(text)
 
     seed = settings.get("seed")
 
-    # Python treats True as the number 1, so True and False are ruled out on
-    # purpose, along with 1.5 and "42".
+    # Python treats True as the number 1, so True and False are ruled out on purpose, along with 1.5 and "42".
     is_whole_number = isinstance(seed, Integral) and not isinstance(seed, bool)
 
     if not is_whole_number or seed < 0:
@@ -58,9 +54,8 @@ def load_settings(path) -> dict:
     return settings
 
 
-# Returns the seed for example number `index` in a run. The same (base_seed,
-# index) always gives the same seed, and different examples get random streams
-# that don't overlap. It stops with a ValueError if either number is negative.
+# Gives back the seed for example number `index` in a run. The same (base_seed, index) always gives the same seed, and
+# different examples get random streams that don't overlap. It stops with a ValueError if either number is negative.
 def example_seed(base_seed: int, index: int) -> int:
     if base_seed < 0 or index < 0:
         raise ValueError("base_seed and index must be non-negative")
@@ -95,8 +90,8 @@ def _is_list_of_dicts(value) -> bool:
     return True
 
 
-# Stops unless sources is a list of dicts with at least one source in it, and
-# every source has a "recording_id".
+# Stops unless sources is a list of dicts with at least 1 source in it, and every source has a "recording_id" that says
+# which recording it came from.
 def _check_sources(sources) -> None:
     if not _is_list_of_dicts(sources):
         raise ValueError("sources must be a list of dicts")
@@ -112,8 +107,7 @@ def _check_sources(sources) -> None:
             raise ValueError(f'every source needs a "recording_id" string, got {recording_id!r}')
 
 
-# Stops unless damage is a list of dicts where every step has a known stage, and
-# all the before_filter steps come first.
+# Stops unless damage is a list of dicts where every step has a known stage, and all the before_filter steps come first.
 def _check_damage(damage) -> None:
     if not _is_list_of_dicts(damage):
         raise ValueError("damage must be a list of dicts, in the order applied")
@@ -126,8 +120,8 @@ def _check_damage(damage) -> None:
         if stage not in STAGES:
             raise ValueError(f"every damage step needs a stage from {STAGES}, got {stages}")
 
-    # The list is in the order the steps ran, so once an after_filter step shows up,
-    # a before_filter step can't come later.
+    # The list is in the order the steps ran, so once an after_filter step shows up, a before_filter step can't come
+    # later.
     seen_after_filter = False
     for stage in stages:
         if stage == "after_filter":
@@ -136,8 +130,8 @@ def _check_damage(damage) -> None:
             raise ValueError(f"damage steps must be in the order applied, before_filter first, got {stages}")
 
 
-# Returns after checking clip and events. It stops with a ValueError if a field
-# is missing, a number is invalid, or an event falls outside the clip.
+# Checks the optional clip & events parts of a record. It stops with a ValueError if a field is missing, a number is
+# bad, or an event falls outside the clip.
 def _check_clip_events(clip, events) -> None:
     if clip is None:
         if events is not None:
@@ -179,12 +173,10 @@ def _check_clip_events(clip, events) -> None:
             raise ValueError("event start_s and end_s must fit inside clip duration_s")
 
 
-# Collects everything needed to rebuild or audit one example: its ID (like
-# "ex-000001"), its own seed, the sample rate, its sources (each with a
-# "recording_id"), the record from apply_filter, and the records from the damage
-# steps in the order they ran. It returns the record as plain Python, ready to
-# save as JSON. It stops with a ValueError if the ID is empty, or the sources or
-# damage are malformed.
+# Collects everything needed to rebuild or double-check 1 example: its ID (like "ex-000001"), its own seed, the sample
+# rate, its sources (each with a "recording_id"), the record from apply_filter & the records from the damage steps in
+# the order they ran. It gives the record back as plain Python, ready to save as JSON. It stops with a ValueError if the
+# ID is empty, or if the sources or damage are put together wrong.
 def build_record(
     example_id: str,
     seed: int,
@@ -220,10 +212,9 @@ def build_record(
     return to_jsonable(record)
 
 
-# Turns numpy values and tuples into plain Python so json can save them. It
-# works through dicts and lists all the way down by calling itself on each item.
-# Dict keys become text, tuples and numpy arrays become lists, and numpy numbers
-# become regular int or float.
+# Turns numpy values & tuples into plain Python so json can save them. It works through dicts & lists all the way down
+# by calling itself on each item. Dict keys become text, tuples & numpy arrays become lists, and numpy numbers become a
+# regular int or float.
 def to_jsonable(value):
     if isinstance(value, dict):
         converted = {}
@@ -252,8 +243,8 @@ def to_jsonable(value):
 # ********************************
 
 
-# Saves a record as readable JSON. The keys are sorted, so two records always
-# list things in the same order and comparing them only shows real differences.
+# Saves a record as readable JSON. The keys are sorted, so 2 records always list things in the same order & comparing
+# them only shows real differences.
 def write_record(record: dict, path) -> None:
     text = json.dumps(to_jsonable(record), indent=2, sort_keys=True)
 

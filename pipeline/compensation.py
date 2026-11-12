@@ -1,8 +1,9 @@
 """
-Undo known Butterworth filters.
+Undoes a known Butterworth filter, to bring back what the filter turned down.
 
-The Python inverse keeps the recovered audio's peaks, even past full scale. The
-C program works on 16-bit PCM WAVs, so its recovered audio clips there.
+There are 2 ways to do it here. The Python inverse is our own copy of the math in Adam's C filter, and it keeps the
+recovered audio's peaks even when they go past full scale. The C inverse runs Adam's real C program. That program reads
+& writes 16-bit WAV files, so its recovered audio gets clipped at full scale.
 
 This file has three groups:
     * Shared checks
@@ -27,8 +28,8 @@ from pipeline.filters import design_filter
 # ********************************
 
 
-# Returns finite mono audio. It stops with a ValueError if the audio is empty,
-# non-finite, or has more than one channel.
+# Gives back the audio as a numpy array after checking it. It stops with a ValueError if the audio is empty, has more
+# than 1 channel, or has values that aren't real numbers (like infinity).
 def _samples(audio) -> np.ndarray:
     samples = np.asarray(audio, dtype=np.float64)
 
@@ -38,8 +39,8 @@ def _samples(audio) -> np.ndarray:
     return samples
 
 
-# Returns the filter for a plain supported spec. It stops with a ValueError if
-# the spec has extra keys, a different family, or an unsupported order.
+# Builds the filter for a spec, after checking the spec is one the inverse can undo: Butterworth only, with nothing
+# extra in the spec, at order 1, 2 or 4 (2, 4 or 8 for a band-pass). It stops with a ValueError if not.
 def _filter(spec, sample_rate) -> np.ndarray:
     if not isinstance(spec, dict) or set(spec) != {"type", "family", "order", "cutoff"}:
         raise ValueError("spec must contain only type, family, order, cutoff")
@@ -63,8 +64,11 @@ def _filter(spec, sample_rate) -> np.ndarray:
 # ********************************
 
 
-# Returns the recovered audio as float64 without clipping. It stops with a
-# ValueError if the audio, filter spec, or FFT settings are invalid.
+# Undoes the filter in Python & gives back the recovered audio, without clipping it. It works through the audio a block
+# at a time: take the block's spectrum (FFT), turn each frequency back up by as much as the filter turned it down, and
+# turn it back into audio. lam keeps it from boosting without limit where the filter cut the deepest, n_fft is the block
+# size & guard is the extra audio on each side of a block that gets thrown away, so the blocks join up cleanly. It stops
+# with a ValueError if the audio, the spec, or those settings are bad.
 def python_inverse(audio, sample_rate, spec, lam=0.001, n_fft=65536, guard=2048) -> np.ndarray:
     samples = _samples(audio)
     sos = _filter(spec, sample_rate)
@@ -78,10 +82,13 @@ def python_inverse(audio, sample_rate, spec, lam=0.001, n_fft=65536, guard=2048)
     if not isinstance(guard, int) or not 0 <= 2 * guard < n_fft:
         raise ValueError("guard must leave a positive hop inside n_fft")
 
+    # What the filter does at each of the FFT's frequencies (response), and the undo for it (inverse). Dividing by
+    # |response|^2 + lam and not just |response|^2 is what keeps the boost from blowing up.
     angles = 2 * np.pi * np.arange(n_fft // 2 + 1) / n_fft
     _, response = signal.sosfreqz(sos, worN=angles)
     inverse = np.conj(response) / (np.abs(response) ** 2 + lam)
 
+    # Each block overlaps its neighbors by `guard` samples on both sides. We only keep the middle `hop` samples.
     hop = n_fft - 2 * guard
     output = np.empty(len(samples), dtype=np.float64)
 
@@ -92,6 +99,7 @@ def python_inverse(audio, sample_rate, spec, lam=0.001, n_fft=65536, guard=2048)
         block_start = first - (offset - guard)
         block[block_start:block_start + end - first] = samples[first:end]
 
+        # Into frequencies, apply the undo, and back into audio.
         spectrum = np.fft.rfft(block)
         spectrum *= inverse
         recovered = np.fft.irfft(spectrum, n_fft)
@@ -107,8 +115,8 @@ def python_inverse(audio, sample_rate, spec, lam=0.001, n_fft=65536, guard=2048)
 # ********************************
 
 
-# Returns the C arguments for a plain spec. A band-pass uses half the total
-# order because the C program counts the poles on each side separately.
+# Turns a filter spec into the arguments Adam's C program expects. A band-pass passes half its order, since the C
+# program counts the poles on each side by itself.
 def _arguments(spec) -> list[str]:
     kind = spec["type"]
     order = spec["order"]
@@ -142,12 +150,10 @@ def _arguments(spec) -> list[str]:
     ]
 
 
-# Returns the C program's recovered audio. The program reads and writes 48 kHz
-# 16-bit PCM WAVs, so the audio goes in rounded to 16-bit steps, and anything
-# the undo pushes past full scale comes back clipped. It stops with a
-# ValueError, including the program's output, if the audio is past full scale,
-# the command fails, or its WAV is invalid. Each call gets its own system
-# temporary folder so the program's int.wav is not shared.
+# Undoes the filter with Adam's C program & gives back the recovered audio. The program reads & writes 48 kHz 16-bit WAV
+# files, so the audio goes in rounded to 16-bit steps, and anything the undo pushes past full scale comes back clipped.
+# Each call gets its own temporary folder, so 2 runs never share the program's int.wav file. It stops with a ValueError
+# (with the program's output in it) if the audio is past full scale, the command fails, or the WAV it wrote is bad.
 def c_inverse(audio, sample_rate, spec, command) -> np.ndarray:
     samples = _samples(audio)
     _filter(spec, sample_rate)
@@ -158,9 +164,8 @@ def c_inverse(audio, sample_rate, spec, command) -> np.ndarray:
     if np.max(np.abs(samples)) > 1:
         raise ValueError("audio must be within full scale for the C program's 16-bit WAV")
 
-    # The C program reads each sample as its 16-bit code / 32768, so save the
-    # codes themselves. A sample at exactly full scale rounds to 32768, one past
-    # the highest code, so it gets the highest code.
+    # The C program reads each sample as its 16-bit code / 32768, so save the codes themselves. A sample at exactly full
+    # scale rounds to 32768, one past the highest code, so it gets the highest code.
     codes = np.clip(np.round(samples * 32768), -32768, 32767).astype(np.int16)
 
     absolute_command = []
@@ -208,8 +213,9 @@ def c_inverse(audio, sample_rate, spec, command) -> np.ndarray:
         return recovered / 32768
 
 
-# Returns recovered audio and the inverse settings. It stops with a ValueError
-# if the method, spec, audio, or C output is invalid.
+# The function other code calls to undo a filter. method picks the Python inverse ("python") or the C program ("c", with
+# command set to how to run it). It gives back the recovered audio & a record of the settings it used. It stops with a
+# ValueError if the method, the spec, the audio, or the C program's output is bad.
 def compensate(audio, sample_rate, spec, method="python", command=None) -> tuple[np.ndarray, dict]:
     _filter(spec, sample_rate)
 

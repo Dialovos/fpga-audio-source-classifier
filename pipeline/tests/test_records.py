@@ -10,8 +10,8 @@ import pytest
 from pipeline.records import SCHEMA_VERSION, build_record, example_seed, load_settings, read_record, write_record
 
 
-# Builds a valid example record from made-up fields. Pass a field by name to
-# change it, so each test only has to spell out the part it's checking.
+# Builds a valid example record from made-up fields. Pass a field by name to change it, so each test only has to spell
+# out the part it's checking.
 def sample_record(**overrides):
     fields = {
         "example_id": "ex-000001",

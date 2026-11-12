@@ -1,8 +1,8 @@
 """
 Checks for the filter ID model (the first AI layer).
 
-These train on small sets of filtered noise made right here in the test, so they
-run in seconds and don't need the data generator.
+These train on small sets of filtered noise made right here in the test, so they run in seconds and don't need the data
+generator.
 """
 
 import json
@@ -27,14 +27,12 @@ CUTOFF_RANGES = {
 }
 
 
-# Returns a number picked evenly on a log scale between low and high, so every
-# octave in the range is equally likely.
+# Returns a number picked evenly on a log scale between low and high, so every octave in the range is equally likely.
 def log_uniform(rng, low, high):
     return float(np.exp(rng.uniform(np.log(low), np.log(high))))
 
 
-# Returns a clip of white noise tilted by tilt_db_per_octave around 1 kHz, so a
-# weak low end isn't always a filter.
+# Returns a clip of white noise tilted by tilt_db_per_octave around 1 kHz, so a weak low end isn't always a filter.
 def source_clip(rng, tilt_db_per_octave):
     n_samples = int(CLIP_SECONDS * FS)
     spectrum = np.fft.rfft(rng.standard_normal(n_samples))
@@ -43,9 +41,8 @@ def source_clip(rng, tilt_db_per_octave):
     return np.fft.irfft(spectrum * 10 ** (gain_db / 20), n_samples)
 
 
-# Returns Butterworth second-order sections for a label. A band-pass is a
-# high-pass at the low edge followed by a low-pass at the high edge, each with
-# half the total order, the same way the C filters build it.
+# Returns Butterworth second-order sections for a label. A band-pass is a high-pass at the low edge followed by a
+# low-pass at the high edge, each with half the total order, the same way the C filters build it.
 def butterworth(label):
     if label["type"] == "bandpass":
         low, high = label["cutoff"]
@@ -56,9 +53,8 @@ def butterworth(label):
     return signal.butter(label["order"], label["cutoff"], label["type"], fs=FS, output="sos")
 
 
-# Builds labeled examples from filtered noise: n_sources recordings, each with
-# its own tilt, and per_source examples from each. The type and order are picked
-# from the given lists, and noise goes in 40 dB below the filtered clip. It
+# Builds labeled examples from filtered noise: n_sources recordings, each with its own tilt, and per_source examples
+# from each. The type and order are picked from the given lists, and noise goes in 40 dB below the filtered clip. It
 # returns the features, the labels, the records, and each row's recording ID.
 def make_examples(types, orders, n_sources=60, per_source=4, seed=0):
     rng = np.random.default_rng(seed)
@@ -84,8 +80,7 @@ def make_examples(types, orders, n_sources=60, per_source=4, seed=0):
     return np.array(features), labels, records, np.array(groups)
 
 
-# Trains on most of the recordings and scores on the rest. It returns the
-# features, the trained model, and the scores.
+# Trains on most of the recordings and scores on the rest. It returns the features, the trained model, and the scores.
 def train_and_score(types, orders):
     features, labels, records, groups = make_examples(types, orders)
     train, test = split_by_recording(groups, 0.25, seed=0)
@@ -94,8 +89,8 @@ def train_and_score(types, orders):
     return features, model, metrics
 
 
-# Trains once on every filter type at order 4, so the type is the main thing to
-# learn, and shares the result with every test that asks for it.
+# Trains once on every filter type at order 4, so the type is the main thing to learn, and shares the result with every
+# test that asks for it.
 @pytest.fixture(scope="module")
 def all_types():
     return train_and_score(ALL_TYPES, ORDER_4)
@@ -159,8 +154,8 @@ def test_predictions_are_specs_the_compensation_filter_can_use(all_types):
 
 
 # Tests: a saved model loads back with its settings and gives the same predictions.
-# Why: the app and the compensation filter will load a model trained earlier. If saving lost anything, they'd
-#   get different answers from the ones we scored.
+# Why: predict loads a model that was trained earlier, often on someone else's machine. If saving lost anything,
+#   it'd give different answers from the ones we scored.
 def test_saved_model_predicts_the_same(all_types, tmp_path):
     features, model, _ = all_types
     path = save_for_predict(model, tmp_path)
@@ -171,8 +166,8 @@ def test_saved_model_predicts_the_same(all_types, tmp_path):
 
 # Tests: predict prints one JSON line per WAV file, in order, with the file name and the predicted spec, and it
 #   reads 32-bit float WAVs. A 3 kHz 4th-order low-pass comes back as a low-pass.
-# Why: the app and the compensation filter read this output, and the team's files are 32-bit float. If a line
-#   went missing or the format changed, they'd undo the wrong filter or none at all.
+# Why: the inverse filter gets built from this output, and the team's files are 32-bit float. If a line went
+#   missing or the format changed, it'd undo the wrong filter or none at all.
 def test_predict_prints_one_json_line_per_wav(all_types, tmp_path, capsys):
     _, model, _ = all_types
     path = save_for_predict(model, tmp_path)
@@ -201,9 +196,8 @@ def test_predict_stops_on_stereo_or_wrong_rate(all_types, tmp_path):
             main(["predict", "--model", str(path), str(tmp_path / name)])
 
 
-# Writes 10 mono WAVs of tilted noise, 2 seconds each, and returns the repo's own
-# train settings pointed at them, with shorter clips and fewer examples so
-# training takes seconds.
+# Writes 10 mono WAVs of tilted noise, 2 seconds each, and returns the repo's own train settings pointed at them, with
+# shorter clips and fewer examples so training takes seconds.
 def train_settings(folder):
     source_dir = folder / "wavs"
     source_dir.mkdir()
@@ -219,8 +213,8 @@ def train_settings(folder):
     return settings
 
 
-# Saves the settings as a JSON file and runs the train command into a new folder.
-# It returns the scores train wrote there.
+# Saves the settings as a JSON file and runs the train command into a new folder. It returns the scores train wrote
+# there.
 def run_train(settings, folder, name):
     settings_path = folder / f"{name}-settings.json"
     settings_path.write_text(json.dumps(settings), encoding="utf-8")
