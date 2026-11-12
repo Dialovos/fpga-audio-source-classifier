@@ -22,9 +22,8 @@ def tone(freq_hz: float, seconds: float = 3.0) -> np.ndarray:
     return np.sin(2 * np.pi * freq_hz * t)
 
 
-# Returns the gain of the filter we actually applied, measured on a steady tone.
-# It uses the last second only, since that's past the start-up transient and
-# integer-Hz tones fit a whole number of cycles in it, so the RMS ratio is exact.
+# Returns the gain of the filter we actually applied, measured on a steady tone. It uses the last second only, since
+# that's past the start-up transient and integer-Hz tones fit a whole number of cycles in it, so the RMS ratio is exact.
 def applied_gain_db(spec: dict, freq_hz: float) -> float:
     x = tone(freq_hz)
     y, _ = apply_filter(x, FS, spec)
@@ -37,9 +36,8 @@ def prewarp(freq_hz: float) -> float:
     return FS / np.pi * np.tan(np.pi * freq_hz / FS)
 
 
-# Returns the textbook analog Butterworth gain in dB, with prewarping. A
-# band-pass is a high-pass at the low edge followed by a low-pass at the high
-# edge, so its dB is the two added together, and order is the order of each side.
+# Returns the textbook analog Butterworth gain in dB, with prewarping. A band-pass is a high-pass at the low edge
+# followed by a low-pass at the high edge, so its dB is the two added together, and order is the order of each side.
 def butterworth_db(freq_hz, kind, order, cutoff):
     if kind == "bandpass":
         highpass = butterworth_db(freq_hz, "highpass", order, cutoff[0])

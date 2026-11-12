@@ -12,8 +12,7 @@ from pipeline.degrade import add_noise, quantize
 FS = 48_000
 
 
-# Returns a sine wave at freq_hz with the given peak amplitude, seconds long, at
-# 48 kHz.
+# Returns a sine wave at freq_hz with the given peak amplitude, seconds long, at 48 kHz.
 def sine(freq_hz: float, amplitude: float, seconds: float = 1.0) -> np.ndarray:
     t = np.arange(int(seconds * FS)) / FS
     return amplitude * np.sin(2 * np.pi * freq_hz * t)

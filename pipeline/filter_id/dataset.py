@@ -1,18 +1,17 @@
 """
-Training data for the filter ID model.
+Layer 1, step 2: make the practice examples the model learns from.
 
-Each example is a source clip filtered with a known Butterworth filter, with noise
-added before or after the filter and 24-bit rounding at the end. The filter it used
-becomes its label, and its record (pipeline.records) says exactly what was done.
+The model needs examples where we already know the right answer. So we make them ourselves: take a 1-second piece of
+clean speech, run it through a filter that we pick at random, add a little noise (before or after the filter), and round
+it the way a recorder would. The filter we picked is the answer the model has to learn, and the example's record (see
+pipeline/records.py) says exactly what was done to it.
 
-The sources are the mono WAV files in the run's "source_dir", at the run's sample
-rate. Each example is a random piece of one source, and the filter is picked
-independently of the source, so the model can't learn "this recording never has
-much low end" in place of the filter.
+The speech comes from the mono WAV files in the run's "source_dir". The filter is picked without looking at which
+recording it is. That matters: if a certain voice always got a certain filter, the model could learn "this voice never
+has much low end" & skip learning the filter.
 
-Debugging tip: every example rebuilds on its own from (settings, index). If one
-looks wrong, call make_example(index, make_sources(settings), settings) and look at
-the audio and the record it returns.
+Debugging tip: every example can be rebuilt by itself from (settings, index). If one looks wrong, call
+make_example(index, make_sources(settings), settings) & look at the audio and the record it gives back.
 
 This file has five groups:
     * Checking settings
@@ -35,27 +34,27 @@ from pipeline.filter_id.features import spectrum_features
 from pipeline.filters import FILTER_TYPES, apply_filter
 from pipeline.records import build_record, example_seed
 
-# Every source clip is scaled to this level (RMS) before it's filtered.
+# Every piece of speech gets scaled to this level before it's filtered. RMS is the average level of the audio, so all
+# the examples start out equally loud.
 SOURCE_RMS = 0.1
 
-# build_dataset reports its progress every this many examples.
+# build_dataset reports how far along it is every this many examples.
 PROGRESS_EVERY = 500
 
 
-# Everything build_dataset makes. Each field has one entry per example, in example
-# order.
+# Everything build_dataset hands back. Each of the 4 fields has 1 entry per example, in the same order.
 @dataclass
 class Dataset:
-    # The spectrum features, one row per example.
+    # The 96 numbers for each example, 1 row per example.
     features: np.ndarray
 
-    # The labels: {"type", "order", "cutoff"} per example.
+    # The right answers: {"type", "order", "cutoff"} for each example.
     labels: list[dict]
 
-    # The recording_id per example, used to split the data by recording.
+    # Which recording each example came from. We use it to split the data by recording.
     groups: np.ndarray
 
-    # The full record per example.
+    # The full record of how each example was made.
     records: list[dict]
 
 
@@ -87,8 +86,8 @@ _REQUIRED_FILTER_SETTINGS = (
 )
 
 
-# Stops if a run's settings are missing something or don't make sense. The
-# ValueError names the first bad or missing setting it finds.
+# Looks over a run's settings before anything gets made. If a setting is missing or doesn't make sense, it stops with a
+# ValueError that names the first problem it found.
 def check_settings(settings: dict) -> None:
     for key in _REQUIRED_SETTINGS:
         if key not in settings:
@@ -133,12 +132,11 @@ def check_settings(settings: dict) -> None:
 # ********************************
 
 
-# Returns one source per mono WAV file in source_dir, after checking each file.
-# Each file's name (without .wav) becomes its recording_id. Every file has to
-# match the run's sample rate and be at least clip_seconds long. Each source also
-# gets a "_path", and keys starting with "_" are private, so they don't go in the
-# records. It stops with a ValueError if the folder has no WAV files, or a file
-# has the wrong sample rate, isn't mono, or is too short.
+# Finds every WAV file in source_dir & gives back 1 source per file, after checking each one. The file's name (without
+# .wav) becomes its recording_id. Every file has to match the run's sample rate, be mono & be at least clip_seconds
+# long. Each source also carries a "_path". Keys that start with "_" are private (like a path on this computer), so they
+# stay out of the saved records. It stops with a ValueError if the folder has no WAV files, or if a file has the wrong
+# sample rate, isn't mono, or is too short.
 def wav_sources(source_dir, sample_rate: int, clip_seconds: float) -> list[dict]:
     paths = sorted(Path(source_dir).glob("*.wav"))
 
@@ -167,7 +165,7 @@ def wav_sources(source_dir, sample_rate: int, clip_seconds: float) -> list[dict]
     return sources
 
 
-# Returns every source for a run: the WAV files in its source_dir.
+# Gives back every source for a run, which is the WAV files in its source_dir.
 def make_sources(settings: dict) -> list[dict]:
     return wav_sources(settings["source_dir"], settings["sample_rate"], settings["clip_seconds"])
 
@@ -177,7 +175,7 @@ def make_sources(settings: dict) -> list[dict]:
 # ********************************
 
 
-# Returns a random piece of a WAV source, n_samples long.
+# Reads a random piece of 1 WAV file, n_samples long.
 def _render_wav_clip(source: dict, n_samples: int, rng: np.random.Generator) -> np.ndarray:
     # Pick a random starting point that leaves room for the whole clip.
     total_frames = sf.info(source["_path"]).frames
@@ -188,9 +186,9 @@ def _render_wav_clip(source: dict, n_samples: int, rng: np.random.Generator) -> 
     return audio
 
 
-# Returns a random piece of a source, scaled to SOURCE_RMS. It stops with a
-# ValueError if the piece comes out silent (for example, a silent stretch of the
-# file).
+# Gives back a random piece of a source, scaled to SOURCE_RMS so every example starts at the same level. It stops with a
+# ValueError if the piece comes out silent (like a silent stretch of the file), since silence can't be scaled to a
+# level.
 def render_source(source: dict, seconds: float, sample_rate: int, rng: np.random.Generator) -> np.ndarray:
     n_samples = round(seconds * sample_rate)
     audio = _render_wav_clip(source, n_samples, rng)
@@ -209,17 +207,17 @@ def render_source(source: dict, seconds: float, sample_rate: int, rng: np.random
 # ********************************
 
 
-# Returns a random number between low and high where every octave is equally
-# likely. For example, 100-200 Hz comes up as often as 1-2 kHz.
+# Picks a random number between low & high where every octave is equally likely. So 100-200 Hz comes up as often as 1-2
+# kHz. We use it for cutoffs, since that's how we hear pitch.
 def _log_uniform(rng: np.random.Generator, low: float, high: float) -> float:
     log_value = rng.uniform(np.log(low), np.log(high))
 
     return float(np.exp(log_value))
 
 
-# Returns a random Butterworth filter spec, using the run's filter settings. The
-# type and order are picked from the settings' lists, each equally likely, and
-# the cutoffs are picked so every octave in their range is equally likely.
+# Picks a random Butterworth filter using the run's filter settings. The type & the order come from the settings' lists,
+# each choice equally likely. The cutoff comes from that type's range, with every octave equally likely. It gives back a
+# filter spec, which is a small dict with the type, family, order & cutoff.
 def sample_filter(filters: dict, rng: np.random.Generator) -> dict:
     # The order of these random draws decides the dataset, so don't reorder them.
     kind = str(rng.choice(filters["types"]))
@@ -240,8 +238,8 @@ def sample_filter(filters: dict, rng: np.random.Generator) -> dict:
 # ********************************
 
 
-# Adds noise on the chosen side of the filter, and applies the filter. It returns
-# the audio, the filter's record, and the noise step's record in a list.
+# Applies the filter, and adds the noise on whichever side of the filter the example calls for. It gives back the audio,
+# the filter's record & the noise step's record in a list.
 def _filter_with_noise(
     audio: np.ndarray,
     spec: dict,
@@ -267,8 +265,8 @@ def _filter_with_noise(
     return audio, filter_record, damage
 
 
-# Returns the source without its private keys, which are the ones starting with
-# "_", like a file path on this computer.
+# Gives back a copy of the source without its private keys, which are the ones that start with "_", like a file path on
+# this computer.
 def _public(source: dict) -> dict:
     public = {}
 
@@ -279,11 +277,10 @@ def _public(source: dict) -> dict:
     return public
 
 
-# Builds example number `index` from its own seed. It renders a clip of the
-# example's source, picks a random filter, adds noise before or after the filter
-# at a random SNR, and rounds to the run's bit depth. Each source gets
-# examples_per_source examples in a row. It returns the audio and a record with
-# the exact source, filter, noise, and rounding.
+# Builds example number `index`, using its own seed so it comes out the same every time. It takes a random piece of the
+# example's source, picks a random filter, adds noise before or after the filter at a random SNR (how many dB louder the
+# speech is than the noise), and rounds to the run's bit depth. Each source gets examples_per_source examples in a row.
+# It gives back the audio & a record of the exact source, filter, noise & rounding.
 def make_example(index: int, sources: list[dict], settings: dict) -> tuple[np.ndarray, dict]:
     seed = example_seed(settings["seed"], index)
     rng = np.random.default_rng(seed)
@@ -310,19 +307,16 @@ def make_example(index: int, sources: list[dict], settings: dict) -> tuple[np.nd
     return audio, record
 
 
-# Returns the labels the model learns for one example, taken from the filter that
-# was really applied.
+# Gives back the right answer for 1 example (type, order & cutoff), taken from the filter that was really applied.
 def label_of(record: dict) -> dict:
     applied = record["filter"]
 
     return {"type": applied["type"], "order": applied["order"], "cutoff": applied["cutoff"]}
 
 
-# Makes every example for a run, and turns each one into features and labels. The
-# settings get checked first. If a progress function is given, it's called as
-# progress(done, total) every PROGRESS_EVERY examples. It returns a Dataset with
-# one entry per example, and stops with a ValueError if the settings or a WAV
-# source is bad.
+# Makes every example for a run & turns each one into its 96 numbers & its right answer. The settings get checked first.
+# If you pass a progress function, it gets called as progress(done, total) every PROGRESS_EVERY examples. It gives back
+# a Dataset with 1 entry per example. It stops with a ValueError if the settings or a WAV file are bad.
 def build_dataset(settings: dict, progress=None) -> Dataset:
     check_settings(settings)
 

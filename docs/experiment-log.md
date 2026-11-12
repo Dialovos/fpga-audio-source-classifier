@@ -14,6 +14,25 @@ Results folder: results/<YYYY-MM-DD>-<your-name>-<short-name>/ (if any)
 Next:
 ```
 
+## 2026-11-12 - filter ID on all 109 speakers, and the repo cut down to layer 1 (Le)
+
+What I tried: Adam's re-copied files fixed the 44 damaged speakers, so all 109 clean WAVs now match his SHA-256 list. I trained the filter ID on all of them with the new train command (python -m pipeline.filter_id train), with the same settings as Nov 6. It made 200 examples per speaker (21,800 in all), trained on 87 speakers & tested on the other 22.
+
+Why: John & Adam have the same 109 files, so this is the run they can rebuild on their own machines & compare with. Before this, training only worked from a script on my machine.
+
+What happened:
+- Type accuracy 0.959, type + order 0.816, order with the true type given 0.851 (band-pass 0.924, high-pass 0.891, low-pass 0.738).
+- Median cutoff error 0.29 to 0.34 octaves on every edge.
+- Noise after the filter is still the hard case. Type + order is 0.947 with the noise before the filter & 0.683 with it after.
+- It's a little better than the 65-speaker run on Nov 6 (0.948, 0.784, 0.829). The test speakers aren't the same ones though, so it isn't an exact comparison.
+- Two runs from the same settings & files give identical scores. There's a test for that now.
+- The event model, the notebook, the final-run settings & the diagrams came out of the current files. They're still in the repo's history at commit 027029a, the last one before the cut. John is writing layer 2, so the older entries below about the event model describe code that's only in that older commit now.
+- The offline app is out of scope now. The team decided not to build it, so its blank spec & its tests came out too. The older entries below that mention the app are from before that.
+
+Results folder: results/2026-11-12-le-filter-id-speech-109/ (metrics.json and settings.json; the model stays out of Git)
+
+Next: John & Adam rebuild this run on their machines & check their metrics.json against ours. Run the C checks on Linux.
+
 ## 2026-11-10 - quick runs on how we train the event model (Le)
 
 What I tried: I ran 4 short runs before the long final ones, to see what's worth running. For each one I set 13 of the 52 train speakers aside, trained on the rest, and scored on those 13, so the 13 test speakers never got touched. I cut the settings down so they'd finish fast (100 rounds, one seed, 150 check clips), so these are rough numbers, not results.

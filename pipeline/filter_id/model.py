@@ -1,14 +1,15 @@
 """
-The filter ID model: gradient-boosted trees from scikit-learn on spectrum features.
+Layer 1, steps 3 & 4: the model that names the filter, plus how we split, score & save it.
 
-It works in steps. One classifier picks the type. Then, for that type, a second
-classifier picks the order, and one regressor per edge predicts the cutoff. Cutoffs
-are predicted in octaves (log2 of Hz), so a 10% miss counts the same at 100 Hz and at
-10 kHz. This is the baseline; a small PyTorch model can replace it later.
+The model is a set of gradient-boosted trees from scikit-learn. A decision tree is a chain of yes/no questions about the
+numbers. Boosting builds many small trees in rounds, where each new round works on what the earlier ones got wrong.
 
-Besides the band levels, the trees also get the slope between neighboring bands.
-Trees can't easily subtract one feature from another, and a filter's knee is a change
-in slope, so handing them the slope directly helps a lot.
+It answers in steps. One classifier picks the type. Then, for that type, a second classifier picks the order, and 1
+regressor per edge predicts the cutoff. (A classifier picks from a list of choices & a regressor predicts a number.)
+Cutoffs are predicted in octaves (log2 of Hz), so being 10% off counts the same at 100 Hz as at 10 kHz.
+
+Besides the 96 band levels, the trees also get the slope between neighboring bands. Trees can't easily subtract one
+number from another, and a filter's knee is a change in slope, so handing them the slope directly helps a lot.
 
 This file has five groups:
     * Tree settings
@@ -25,10 +26,11 @@ import numpy as np
 from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 from sklearn.model_selection import GroupShuffleSplit
 
-# Bump this if the saved file's layout changes, so old files fail with a clear message.
+# The version of the saved file's layout. Bump it if the layout changes, so an old file fails with a clear message &
+# doesn't load wrong.
 MODEL_FORMAT = 1
 
-# How many trees each model builds, and how big a step each new tree takes.
+# How many rounds of trees each model builds, and how big a step each new round takes.
 TREE_ITERATIONS = 300
 LEARNING_RATE = 0.1
 
@@ -38,8 +40,8 @@ LEARNING_RATE = 0.1
 # ********************************
 
 
-# Returns an untrained tree classifier, which picks a category like the type or
-# the order. Early stopping is off, so training always runs the same way.
+# Makes an untrained tree classifier, which picks from a list of choices (like the type or the order). Early stopping is
+# off, so training runs the same way every time.
 def _classifier(seed: int) -> HistGradientBoostingClassifier:
     return HistGradientBoostingClassifier(
         max_iter=TREE_ITERATIONS,
@@ -49,8 +51,7 @@ def _classifier(seed: int) -> HistGradientBoostingClassifier:
     )
 
 
-# Returns an untrained tree regressor, which predicts a number like a cutoff.
-# Early stopping is off, so training always runs the same way.
+# Makes an untrained tree regressor, which predicts a number (like a cutoff). Early stopping is off here too.
 def _regressor(seed: int) -> HistGradientBoostingRegressor:
     return HistGradientBoostingRegressor(
         max_iter=TREE_ITERATIONS,
@@ -60,9 +61,8 @@ def _regressor(seed: int) -> HistGradientBoostingRegressor:
     )
 
 
-# Stands in for the order classifier when the training data has only one order
-# for a type. A real classifier needs at least two choices to learn from, so this
-# one just always answers with the one order it saw.
+# A stand-in for the order classifier when the training data only has 1 order for a type. A real classifier needs at
+# least 2 choices to learn from, so this one just always answers with the 1 order it saw.
 class _OnlyChoice:
     # Remembers the one order every prediction will get.
     def __init__(self, value):
@@ -78,9 +78,8 @@ class _OnlyChoice:
 # ********************************
 
 
-# Returns the band levels with the slope between each pair of neighboring bands
-# added on the end. It takes one row of features or many rows, and always returns
-# rows (a 2-D array).
+# Gives back the band levels with the slope between each pair of neighboring bands added on the end, so 96 numbers
+# become 191. It takes 1 row of features or many, and always gives back rows (a 2-D array).
 def _with_slopes(features) -> np.ndarray:
     X = np.atleast_2d(np.asarray(features, dtype=np.float64))
 
@@ -90,8 +89,8 @@ def _with_slopes(features) -> np.ndarray:
     return np.hstack([X, slopes])
 
 
-# Returns a cutoff as a list of edges in Hz: [low, high] for a band-pass, and
-# [cutoff] for the other types.
+# Gives back a cutoff as a list of edges in Hz: [low, high] for a band-pass & [cutoff] for the other 2 types. That way
+# the rest of the code can treat every type the same.
 def cutoff_edges(kind: str, cutoff) -> list[float]:
     if kind == "bandpass":
         return [float(cutoff[0]), float(cutoff[1])]
@@ -99,7 +98,7 @@ def cutoff_edges(kind: str, cutoff) -> list[float]:
     return [float(cutoff)]
 
 
-# Returns the names the scores use for a type's cutoff edges.
+# Gives back the names the scores use for a type's cutoff edges.
 def _edge_names(kind: str) -> list[str]:
     if kind == "bandpass":
         return ["bandpass_low", "bandpass_high"]
@@ -122,7 +121,7 @@ def _pick_rows(items: list, rows) -> list:
 # ********************************
 
 
-# Predicts a filter's type, order, and cutoffs from spectrum features.
+# The model itself. It predicts a filter's type, order & cutoffs from the spectrum features.
 class FilterIdModel:
     # Makes an untrained model. The seed makes training repeat exactly.
     def __init__(self, seed: int = 0):
@@ -134,10 +133,9 @@ class FilterIdModel:
         self.cutoff_models = {}
         self.cutoff_ranges = {}
 
-    # Trains the model on examples: spectrum features with one row per example,
-    # and one {"type", "order", "cutoff"} label per row. It returns the model
-    # itself, now trained, and stops with a ValueError if the features and labels
-    # have different lengths.
+    # Trains the model. features has 1 row per example & labels has 1 {"type", "order", "cutoff"} answer per row. It
+    # gives back the model itself, now trained. It stops with a ValueError if the features & labels have different
+    # lengths.
     def fit(self, features, labels: list[dict]) -> FilterIdModel:
         X = _with_slopes(features)
 
@@ -167,7 +165,7 @@ class FilterIdModel:
 
         return self
 
-    # Trains the order classifier for one type.
+    # Trains the order classifier for 1 type.
     def _fit_order(self, kind: str, X: np.ndarray, labels: list[dict]) -> None:
         orders = []
         for label in labels:
@@ -180,8 +178,7 @@ class FilterIdModel:
         else:
             self.order_models[kind] = _classifier(self.seed).fit(X, orders)
 
-    # Trains one cutoff regressor per edge for one type. The regressors learn log2
-    # of the cutoff (octaves), not Hz.
+    # Trains 1 cutoff regressor per edge for 1 type. The regressors learn log2 of the cutoff (octaves), not Hz.
     def _fit_cutoffs(self, kind: str, X: np.ndarray, labels: list[dict]) -> None:
         edges_hz = []
         for label in labels:
@@ -197,17 +194,16 @@ class FilterIdModel:
 
         self.cutoff_models[kind] = regressors
 
-        # Remember the lowest and highest cutoff seen in training. Predictions get
-        # clipped to this range, so they're always cutoffs the filter code accepts.
+        # Remember the lowest and highest cutoff seen in training. Predictions get clipped to this range, so they're
+        # always cutoffs the filter code accepts.
         self.cutoff_ranges[kind] = (octaves.min(axis=0), octaves.max(axis=0))
 
-    # Stops if predict is called before the model is trained.
+    # Stops if predict gets called before the model is trained.
     def _check_trained(self) -> None:
         if self.type_model is None:
             raise RuntimeError("the model isn't trained yet; call fit first or load a saved model")
 
-    # Returns the predicted cutoff edges in Hz for one type, with one row per
-    # example and one column per edge.
+    # Gives back the predicted cutoff edges in Hz for 1 type, with 1 row per example & 1 column per edge.
     def _predict_cutoffs(self, X: np.ndarray, kind: str) -> np.ndarray:
         lowest, highest = self.cutoff_ranges[kind]
 
@@ -220,7 +216,7 @@ class FilterIdModel:
 
         return np.column_stack(columns)
 
-    # Predicts the order and cutoffs for every row, assuming every row is the given type.
+    # Predicts the order & cutoffs for every row, treating every row as the given type.
     def _given_type(self, X: np.ndarray, kind: str) -> list[dict]:
         order_model = self.order_models[kind]
         order_proba = order_model.predict_proba(X)
@@ -244,11 +240,10 @@ class FilterIdModel:
 
         return results
 
-    # Predicts the filter for one row of spectrum features or many rows. If kind is
-    # given, it skips the type step and assumes that type, which is how the order
-    # and cutoffs get scored on their own. It returns one {"spec", "confidence"}
-    # result per row, and the spec has everything the compensation filter needs
-    # to undo the filter. It stops with a RuntimeError if the model isn't trained.
+    # Predicts the filter for 1 row of features or many. Normally it picks the type first. If kind is given, it skips
+    # that step & treats every row as that type, which is how the order & cutoffs get scored on their own. It gives back
+    # 1 {"spec", "confidence"} result per row. The spec has everything the inverse filter needs to undo the filter. It
+    # stops with a RuntimeError if the model isn't trained.
     def predict(self, features, kind: str | None = None) -> list[dict]:
         self._check_trained()
         X = _with_slopes(features)
@@ -267,8 +262,8 @@ class FilterIdModel:
         best_type = np.argmax(type_proba, axis=1)
         predicted_types = self.type_model.classes_[best_type]
 
-        # Step 2: for each type, run that type's order and cutoff models on its rows,
-        # then put each result back in its row's place.
+        # Step 2: for each type, run that type's order and cutoff models on its rows, then put each result back in its
+        # row's place.
         results = []
         for _ in range(len(X)):
             results.append({})
@@ -284,10 +279,10 @@ class FilterIdModel:
         return results
 
 
-# Splits the examples into train and test, with every recording entirely on one
-# side. groups is the recording_id of each example, test_fraction is about what
-# share of the recordings goes to test, and the seed makes the split repeat
-# exactly. It returns the train row numbers and the test row numbers.
+# Splits the examples into train & test, with every recording entirely on one side. That way the test is always on
+# voices the model never trained on. groups is the recording_id of each example, test_fraction is ~what share of the
+# recordings go to test, and the seed makes the split come out the same every time. It gives back the train row numbers
+# & the test row numbers.
 def split_by_recording(groups, test_fraction: float, seed: int) -> tuple[np.ndarray, np.ndarray]:
     splitter = GroupShuffleSplit(n_splits=1, test_size=test_fraction, random_state=seed)
 
@@ -303,7 +298,7 @@ def split_by_recording(groups, test_fraction: float, seed: int) -> tuple[np.ndar
 # ********************************
 
 
-# Returns the share of True values (0 to 1), or NaN if there's nothing to count.
+# Gives back the share of True values (0 to 1), or NaN if there's nothing to count.
 def _accuracy(hits) -> float:
     if len(hits) == 0:
         return float("nan")
@@ -311,9 +306,9 @@ def _accuracy(hits) -> float:
     return float(np.mean(hits))
 
 
-# Scores the order and cutoff steps with each example's true type given. It
-# returns the order hits (True/False per example, grouped by type) and the cutoff
-# errors (in octaves, grouped by edge name).
+# Scores the order & cutoff steps with each example's true type handed to the model, so a wrong type doesn't drag those
+# scores down. It gives back the order hits (True/False per example, grouped by type) & the cutoff errors (in octaves,
+# grouped by edge name).
 def _scores_given_true_type(model: FilterIdModel, X: np.ndarray, labels: list[dict]) -> tuple[dict, dict]:
     true_types = []
     for label in labels:
@@ -345,8 +340,8 @@ def _scores_given_true_type(model: FilterIdModel, X: np.ndarray, labels: list[di
     return order_hits, cutoff_errors
 
 
-# Counts how often each true type was predicted as each type, as
-# {true type: {predicted type: count}}.
+# Counts how often each true type got predicted as each type, as {true type: {predicted type: count}}. It shows which
+# types get mixed up.
 def _type_confusion(predicted: list[dict], labels: list[dict]) -> dict:
     confusion = {}
 
@@ -382,12 +377,10 @@ def _scores_by_noise_stage(type_hits: np.ndarray, both_hits: np.ndarray, records
     return by_stage
 
 
-# Scores a trained model on held-out examples. It takes the spectrum features,
-# the true {"type", "order", "cutoff"} label for each row, and the full record for
-# each row (used to split the scores by noise stage). It returns a dict of scores
-# that can be saved as JSON. Accuracies go from 0 to 1, and cutoff errors are in
-# octaves (0.1 octave is about 7%). It stops with a ValueError if the features,
-# labels, and records have different lengths.
+# Scores a trained model on examples it never trained on. It takes the features, the right answer for each row & the
+# full record for each row (used to split the scores by where the noise went). It gives back a dict of scores that can
+# be saved as JSON. Accuracies go from 0 to 1, and cutoff errors are in octaves (0.1 octave is ~7%). It stops with a
+# ValueError if the features, labels & records have different lengths.
 def evaluate(model: FilterIdModel, features, labels: list[dict], records: list[dict]) -> dict:
     X = np.atleast_2d(np.asarray(features))
 
@@ -444,18 +437,16 @@ def evaluate(model: FilterIdModel, features, labels: list[dict], records: list[d
 # ********************************
 
 
-# Saves a trained model with the settings it was trained on. Predicting needs the
-# same feature settings the model was trained with, so they're saved together.
+# Saves a trained model together with the settings it was trained on. Predicting needs the same feature settings the
+# model was trained with, so they travel in the same file.
 def save_model(path, model: FilterIdModel, settings: dict) -> None:
     saved = {"format": MODEL_FORMAT, "model": model, "settings": settings}
 
     joblib.dump(saved, path)
 
 
-# Loads a model saved by save_model and returns the model and the settings it was
-# trained on. Only load files you made yourself, since joblib files can run code
-# when they're loaded. It stops with a ValueError if the file was saved in a
-# different format.
+# Loads a model saved by save_model & gives back the model and its settings. Only load files you made yourself, since
+# joblib files can run code when they're loaded. It stops with a ValueError if the file was saved in a different format.
 def load_model(path) -> tuple[FilterIdModel, dict]:
     saved = joblib.load(path)
 
