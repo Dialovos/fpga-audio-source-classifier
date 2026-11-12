@@ -1,18 +1,12 @@
 # fpga-audio-source-classifier
 
-CSC 4240 team project. A recording goes through an unknown filter that cuts out part of the sound. Our system has 3 parts:
+CSC 4240 team project. A recording goes through an unknown filter that cuts out part of the sound, and our system tries to get it back in 3 parts. Layer 1 is an AI model that looks at the filtered recording & figures out which filter it went through. The inverse filter is DSP written in C, and it uses that answer to bring back what the filter turned down. Layer 2 is a second AI model that finds the sound events that were buried.
 
-1. Layer 1 (AI): looks at the filtered recording & figures out which filter it went through.
-2. Inverse filter (DSP, written in C): uses that answer to bring back what the filter turned down.
-3. Layer 2 (AI): finds the sound events that were buried.
-
-Right now this repo has layer 1 (`pipeline/filter_id/`) and the inverse filter (`pipeline/reversable_filters/`, with a Python copy of it in `pipeline/compensation.py`). Layer 2 is being written. The earlier version of layer 2, the offline app, the notebook & the diagrams are on the `archive/event-model` branch if you need them.
-
-Our notes on what we tried & what happened are in `docs/experiment-log.md`.
+Right now this repo has layer 1 (`pipeline/filter_id/`) and the inverse filter (`pipeline/reversable_filters/`, with a Python copy of it in `pipeline/compensation.py`). Layer 2 is being written. The earlier version of layer 2, the offline app, the notebook & the diagrams are on the `archive/event-model` branch if you need them. Our notes on what we tried & what happened are in `docs/experiment-log.md`.
 
 ## All the commands, in order
 
-Run these from the repo folder. The sections below explain each step.
+Run these from the repo folder. The sections below explain each step, and the recordings have to be in place before the `train` line (step 3).
 
 ```
 git clone https://github.com/Dialovos/fpga-audio-source-classifier.git
@@ -26,11 +20,9 @@ python -m pipeline.filter_id train --out results/my-run
 python -m pipeline.filter_id predict --model results/my-run/model.joblib clip.wav
 ```
 
-The recordings have to be in place before the `train` line (step 3 below).
-
 ## 1. Set up
 
-You need Python 3.12. That's the version our results were made with. The `venv` lines make a private Python environment in the repo folder, and the `pip` line installs the 5 packages we use into it.
+You need Python 3.12, which is the version our results were made with. The `venv` lines make a private Python environment in the repo folder, and the `pip` line installs the 5 packages we use into it.
 
 ## 2. Check that it works
 
@@ -48,13 +40,7 @@ python -m pytest pipeline/tests/check_c_filter.py
 
 ## 3. Put the recordings in place
 
-The speech is the CSTR VCTK Corpus (version 0.80), saved as one mono 48 kHz WAV per speaker. That's 109 files & ~15 GB, which is too big for Git. Copy the 109 clean WAVs into this folder:
-
-```
-data/adam-good/clean/
-```
-
-Git ignores everything inside `data/`, so they won't get committed.
+The speech is the CSTR VCTK Corpus (version 0.80), saved as one mono 48 kHz WAV per speaker. That's 109 files & ~15 GB, which is too big for Git. Copy the 109 clean WAVs into `data/adam-good/clean/` inside the repo folder. Git ignores everything inside `data/`, so they won't get committed.
 
 To train on other recordings, use any folder of mono 48 kHz WAVs that are at least 1 second long. Make a copy of `pipeline/filter_id/settings.json`, change `source_dir` in the copy to your folder, and add `--settings your-copy.json` to the train command.
 
@@ -64,28 +50,13 @@ To train on other recordings, use any folder of mono 48 kHz WAVs that are at lea
 python -m pipeline.filter_id train --out results/my-run
 ```
 
-What it does:
+First it cuts 200 random 1-second pieces of speech from each recording. It runs each piece through a random filter that it picks itself, so it knows the right answer, and then it adds a little noise. It sets 20% of the speakers aside for testing, and the model never trains on them. Then it trains on the other 80% & scores itself on the speakers it set aside.
 
-1. From each recording it cuts 200 random 1-second pieces of speech.
-2. It runs each piece through a random filter that it picks itself, so it knows the right answer. Then it adds a little noise.
-3. It sets 20% of the speakers aside for testing. The model never trains on them.
-4. It trains on the other 80%, then scores itself on the speakers it set aside.
-
-It writes 3 files into the new folder:
-
-- `model.joblib`: the trained model (~20 MB, so Git ignores it)
-- `metrics.json`: the scores, and which speakers were set aside
-- `settings.json`: the settings the run used
-
-With the 109 recordings it takes ~5 minutes. `--out` has to be a folder that doesn't exist yet, so an old run never gets overwritten.
+It writes 3 files into the new folder. `model.joblib` is the trained model, which is ~20 MB, so Git ignores it. `metrics.json` has the scores & which speakers were set aside. `settings.json` has the settings the run used. With the 109 recordings the whole thing takes ~5 minutes. `--out` has to be a folder that doesn't exist yet, so an old run never gets overwritten.
 
 To check your run against ours, open your `metrics.json` next to `results/2026-11-12-le-filter-id-speech-109/metrics.json`. On the same machine, two runs come out identical except for `seconds`. On a different machine the scores should be the same or very close. If `test_recording_ids` is different, your WAV files aren't the same as ours.
 
-What our run got on the 22 speakers it set aside:
-
-- It names the right filter type 95.9% of the time.
-- It gets the type & the order both right 81.6% of the time.
-- Its cutoff is typically off by ~0.3 octaves, which is ~23%.
+On the 22 speakers it set aside, our run names the right filter type 95.9% of the time & gets the type and the order both right 81.6% of the time. Its cutoff is typically off by ~0.3 octaves, which is ~23%.
 
 ## 5. Ask it about a recording
 
@@ -93,23 +64,15 @@ What our run got on the 22 speakers it set aside:
 python -m pipeline.filter_id predict --model results/my-run/model.joblib clip.wav
 ```
 
-The WAV has to be mono & 48 kHz. You can list more than one. Each file prints as one line:
+The WAV has to be mono & 48 kHz, and you can list more than one. Each file prints as one line:
 
 ```
 {"file": "clip.wav", "spec": {"type": "bandpass", "family": "butter", "order": 2, "cutoff": [125.4, 3508.5]}, "confidence": {"order": 0.50, "type": 0.95}}
 ```
 
-How to read it:
+The `type` is `lowpass`, `highpass`, or `bandpass`. The `order` is how steep the filter is. It's 1, 2, or 4, and a band-pass counts both of its sides together, so it's 2, 4, or 8. The `cutoff` is where the filter starts cutting, in Hz, and a band-pass has two of them: `[low, high]`. The `confidence` is how sure the model is about the type & the order, from 0 to 1.
 
-- `type`: `lowpass`, `highpass`, or `bandpass`.
-- `order`: how steep the filter is. It's 1, 2, or 4. A band-pass counts both of its sides together, so it's 2, 4, or 8.
-- `cutoff`: where the filter starts cutting, in Hz. A band-pass has two: `[low, high]`.
-- `confidence`: how sure the model is about the type & the order, from 0 to 1.
-
-Two things to know:
-
-- The model always names a filter. It has no "this wasn't filtered" answer, so only give it filtered audio.
-- The C inverse filter counts each side of a band-pass by itself, so it gets half of the band-pass order.
+The model always names a filter. It has no "this wasn't filtered" answer, so only give it filtered audio. Also, the C inverse filter counts each side of a band-pass by itself, so it gets half of the band-pass order.
 
 ## Credits
 
