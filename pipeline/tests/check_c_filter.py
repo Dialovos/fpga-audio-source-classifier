@@ -8,13 +8,15 @@ and against an undo done in one piece, and the program gets bad calls to see wha
 changed.
 
 They need Linux with gcc, make, and FFTW (on Ubuntu: sudo apt install build-essential libfftw3-dev), so the file
-isn't named test_*.py and the normal test run leaves it out. Run it on its own from the repo root:
+isn't named test_*.py and the normal test run leaves it out. On Windows or macOS, running it skips every check with
+a note, so it can't fail on a machine that can't build the C program. Run it on its own from the repo root:
 
     python -m pytest pipeline/tests/check_c_filter.py
 """
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -59,6 +61,9 @@ ROUND_TRIP_SAMPLES = FS
 ROUND_TRIP_EDGE = 8192
 PASSBAND_GAIN = 0.5
 ROUND_TRIP_TOLERANCE = 1e-2
+
+# The C program only builds on Linux. On any other machine, every check in this file gets skipped with this note.
+pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="the C filter checks need Linux with gcc, make & FFTW")
 
 
 # Builds the C program once for this file and returns its path. The source files get copied to a temporary folder

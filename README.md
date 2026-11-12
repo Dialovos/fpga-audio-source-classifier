@@ -38,6 +38,8 @@ The C filter has its own checks. They build the C program, compare its output wi
 python -m pytest pipeline/tests/check_c_filter.py
 ```
 
+On Windows or macOS that command skips every check & says why, so it can't fail on a machine that can't build the C program.
+
 ## 3. Put the recordings in place
 
 The speech is the CSTR VCTK Corpus (version 0.80), saved as one mono 48 kHz WAV per speaker. That's 109 files & ~15 GB, which is too big for Git. Copy the 109 clean WAVs into `data/adam-good/clean/` inside the repo folder. Git ignores everything inside `data/`, so they won't get committed.
