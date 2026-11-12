@@ -1,0 +1,86 @@
+{
+  "examples": 4400,
+  "type_accuracy": 0.9586363636363636,
+  "type_and_order_accuracy": 0.8161363636363637,
+  "order_accuracy_given_true_type": 0.8513636363636363,
+  "order_accuracy_given_true_type_by_type": {
+    "bandpass": 0.9239806496199032,
+    "highpass": 0.8913333333333333,
+    "lowpass": 0.7377838953888507
+  },
+  "cutoff_error_octaves": {
+    "bandpass_low": {
+      "median": 0.3291832583346057,
+      "p90": 0.9555545754562289
+    },
+    "bandpass_high": {
+      "median": 0.2912236180447302,
+      "p90": 0.874649444289536
+    },
+    "highpass": {
+      "median": 0.2938762428697103,
+      "p90": 0.9369244949438472
+    },
+    "lowpass": {
+      "median": 0.33662392965055693,
+      "p90": 0.9270341427910326
+    }
+  },
+  "by_noise_stage": {
+    "after_filter": {
+      "examples": 2180,
+      "type_accuracy": 0.936697247706422,
+      "type_and_order_accuracy": 0.6830275229357798
+    },
+    "before_filter": {
+      "examples": 2220,
+      "type_accuracy": 0.9801801801801802,
+      "type_and_order_accuracy": 0.9468468468468468
+    }
+  },
+  "type_confusion": {
+    "bandpass": {
+      "bandpass": 1350,
+      "lowpass": 24,
+      "highpass": 73
+    },
+    "lowpass": {
+      "lowpass": 1436,
+      "bandpass": 16,
+      "highpass": 1
+    },
+    "highpass": {
+      "highpass": 1432,
+      "bandpass": 66,
+      "lowpass": 2
+    }
+  },
+  "train_examples": 17400,
+  "train_recordings": 87,
+  "test_recordings": 22,
+  "test_recording_ids": [
+    "Speaker103",
+    "Speaker12",
+    "Speaker14",
+    "Speaker15",
+    "Speaker19",
+    "Speaker21",
+    "Speaker23",
+    "Speaker24",
+    "Speaker28",
+    "Speaker33",
+    "Speaker34",
+    "Speaker54",
+    "Speaker6",
+    "Speaker64",
+    "Speaker65",
+    "Speaker68",
+    "Speaker7",
+    "Speaker70",
+    "Speaker73",
+    "Speaker77",
+    "Speaker78",
+    "Speaker99"
+  ],
+  "seconds": 265.6
+}

@@ -1,139 +1,116 @@
 # fpga-audio-source-classifier
 
-CSC 4240 team project. An AI model identifies an unknown filter on an audio channel, a DSP inverse filter tries to bring back what the filter turned down, and a second AI model detects the sound events that were buried. It runs offline on WAV files on Windows or Linux, and we also plan to run a small version of the filter ID model on a MicroBlaze on an Artix-7 FPGA.
+CSC 4240 team project. A recording goes through an unknown filter that cuts out part of the sound. Our system has 3 parts:
 
-- Plan: `docs/project-plan.docx`
-- How we use Git: `git-protocol.docx`
-- What we tried and what happened: `docs/experiment-log.md`
-- How the whole project fits together: `docs/project-map/README.md` (diagrams, with the draw.io source next to them)
-- How the filter ID code fits together: `docs/code-map/README.md`
-- How we planned the event model: `docs/event-model-map/README.md` (the code in `pipeline/event_model/` may differ in the details)
+1. Layer 1 (AI): looks at the filtered recording & figures out which filter it went through.
+2. Inverse filter (DSP, written in C): uses that answer to bring back what the filter turned down.
+3. Layer 2 (AI): finds the sound events that were buried.
 
-## Setup
+Right now this repo has layer 1 (`pipeline/filter_id/`) and the inverse filter (`pipeline/reversable_filters/`, with a Python copy of it in `pipeline/compensation.py`). Layer 2 is being written. The earlier version of layer 2, the offline app, the notebook & the diagrams are on the `archive/event-model` branch if you need them.
 
-You need Python 3.10 or newer.
+Our notes on what we tried & what happened are in `docs/experiment-log.md`.
+
+## All the commands, in order
+
+Run these from the repo folder. The sections below explain each step.
 
 ```
+git clone https://github.com/Dialovos/fpga-audio-source-classifier.git
+cd fpga-audio-source-classifier
 python -m venv .venv
 .venv\Scripts\activate            (Windows)
 source .venv/bin/activate         (Linux / macOS)
 pip install -r requirements.txt
+python -m pytest pipeline/tests -q
+python -m pipeline.filter_id train --out results/my-run
+python -m pipeline.filter_id predict --model results/my-run/model.joblib clip.wav
 ```
 
-## Test
+The recordings have to be in place before the `train` line (step 3 below).
 
-Run this from the repo root:
+## 1. Set up
+
+You need Python 3.12. That's the version our results were made with. The `venv` lines make a private Python environment in the repo folder, and the `pip` line installs the 5 packages we use into it.
+
+## 2. Check that it works
 
 ```
-python -m pytest -q
+python -m pytest pipeline/tests -q
 ```
 
-The C filter in `pipeline/reversable_filters/` has its own checks, which build it, compare its output with Python, and try it on bad calls. They need Linux with gcc, make, and FFTW (on Ubuntu: `sudo apt install build-essential libfftw3-dev`), so the run above leaves them out. Run them on their own:
+It should end with `115 passed` after ~30 seconds. The tests make their own audio, so you don't need the recordings for this step.
+
+The C filter has its own checks. They build the C program, compare its output with Python, and try it on bad calls. They need Linux with gcc, make & FFTW (on Ubuntu: `sudo apt install build-essential libfftw3-dev`), so the command above leaves them out. Run them by themselves:
 
 ```
 python -m pytest pipeline/tests/check_c_filter.py
 ```
 
-## Pipeline walkthrough
+## 3. Put the recordings in place
 
-The easiest way to try everything is `pipeline/notebooks/pipeline-walkthrough.ipynb`. It takes one sound through the whole pipeline: it filters it, adds noise, has the filter ID model guess the filter, and undoes the filter with the real settings and with the guess. It saves every version as a WAV so you can listen to it in a DAW. Then it trains or loads the event model on the team's voiceovers, plots a test clip, runs the four-version comparison, finds the events in a WAV, and runs the tests.
-
-Open it in VS Code or Jupyter with the `.venv` kernel. Change `pipeline-walkthrough-settings.json` in the repo root to try a different sound, filter, noise level, or model, then rerun the cells. The notebook's first cell lists what each setting does. The voiceovers go in `data/test-data-prelim-48k/`, as mono 48 kHz WAVs.
-
-## Filter ID model (first AI layer)
-
-Predict the filter on mono WAV files at the model's sample rate (48 kHz):
+The speech is the CSTR VCTK Corpus (version 0.80), saved as one mono 48 kHz WAV per speaker. That's 109 files & ~15 GB, which is too big for Git. Copy the 109 clean WAVs into this folder:
 
 ```
-python -m pipeline.filter_id predict --model model.joblib clip.wav
+data/adam-good/clean/
 ```
 
-Each prediction prints as one JSON line with a `spec` (type, family, order, cutoff) and how confident the model is in the type and the order. A band-pass order is the total for both sides, so the C compensation filter in `pipeline/reversable_filters/`, which counts each side, gets half. Training isn't in the repo yet. It comes once the model's been tested on the team's recordings.
+Git ignores everything inside `data/`, so they won't get committed.
 
-## Event model (second AI layer)
+To train on other recordings, use any folder of mono 48 kHz WAVs that are at least 1 second long. Make a copy of `pipeline/filter_id/settings.json`, change `source_dir` in the copy to your folder, and add `--settings your-copy.json` to the train command.
 
-The event model finds 7 kinds of sounds you'd hear in a cockpit, and gives each one a start, an end, and a confidence:
-
-- Rumble: low noise below ~150 Hz
-- Hum: a steady low tone with harmonics, 50-400 Hz
-- Whine: a steady high tone, 2-12 kHz
-- Hiss: high noise from 4-8 kHz up to 20 kHz
-- Alarm: a tone at 500 Hz-3 kHz that beeps on and off
-- Thump: a short low knock
-- Click: a short broadband click
-
-Right now every event is made by `pipeline/event_model/events.py` and mixed into real speech at a time and level it picks, so the labels are exact. None of them are recorded sounds yet.
-
-It can read our own frame features, a pretrained sound model's (PANNs CNN14, below), or both. The `pretrained` block of `pipeline/event_model/settings.json` picks which.
-
-To train it from the command line:
+## 4. Train layer 1
 
 ```
-python -m pipeline.event_model train --out results/<YYYY-MM-DD>-<your-name>-<short-name>
+python -m pipeline.filter_id train --out results/my-run
 ```
 
-It trains on the recordings in `sources.source_dir` of `pipeline/event_model/settings.json`, which is the clean speech of the undamaged speakers in `data/adam-good/clean/` by default. The older voiceovers in `data/test-data-prelim/` are 192 kHz and no longer load; `pipeline-walkthrough-settings.json` points at 48 kHz copies of them in `data/test-data-prelim-48k/`. To use other recordings, point it at a folder of mono 48 kHz WAV files and list any noisy copies in `recording_groups`.
+What it does:
 
-There are 4 more settings you can put in the `clips` block of a settings file. If you leave one out, the code does what it did before, so older runs still load:
+1. From each recording it cuts 200 random 1-second pieces of speech.
+2. It runs each piece through a random filter that it picks itself, so it knows the right answer. Then it adds a little noise.
+3. It sets 20% of the speakers aside for testing. The model never trains on them.
+4. It trains on the other 80%, then scores itself on the speakers it set aside.
 
-- `speech_rms` (0.1): the RMS level the speech gets scaled to before the events go in.
-- `train_level_db` ([0, 0]): each train and tune clip gets moved by a random number of dB in this range, so the model hears more than one recording level.
-- `train_filtered_chance` (0) and `train_undone_chance` (0): how often a train or tune clip gets filtered like a test case, or filtered and then undone with the true filter. Clean clips get the rest. With both at 0 the model only trains on clean clips, which is the main comparison.
+It writes 3 files into the new folder:
 
-To find the events in mono 48 kHz WAV files:
+- `model.joblib`: the trained model (~20 MB, so Git ignores it)
+- `metrics.json`: the scores, and which speakers were set aside
+- `settings.json`: the settings the run used
 
-```
-python -m pipeline.event_model detect --model results/<run>/model.joblib clip.wav
-```
+With the 109 recordings it takes ~5 minutes. `--out` has to be a folder that doesn't exist yet, so an old run never gets overwritten.
 
-Each file prints as one JSON line with its events.
+To check your run against ours, open your `metrics.json` next to `results/2026-11-12-le-filter-id-speech-109/metrics.json`. On the same machine, two runs come out identical except for `seconds`. On a different machine the scores should be the same or very close. If `test_recording_ids` is different, your WAV files aren't the same as ours.
 
-To compare detection on four versions of the same held-out test clips (clean, filtered, filter undone with the known settings, and filter undone with the filter ID model's guess):
+What our run got on the 22 speakers it set aside:
 
-```
-python -m pipeline.event_model compare --model results/<run>/model.joblib --filter-id-model <filter-id-model.joblib> --out results/<run>/compare
-```
+- It names the right filter type 95.9% of the time.
+- It gets the type & the order both right 81.6% of the time.
+- Its cutoff is typically off by ~0.3 octaves, which is ~23%.
 
-It writes the scores to `metrics.json`, one line per test case to `cases.jsonl`, and a few example WAVs to `examples/`. Leave out `--filter-id-model` to skip the AI guess version. The filter gets undone with our Python copy of the C inverse. On Linux, where the C program builds, add `--method c --c-command pipeline/reversable_filters/filter`. The C program reads and writes 16-bit PCM, so its undone audio clips at full scale, while the Python copy keeps the peaks.
-
-### The final runs
-
-The settings for the final event model runs are in `run-settings/`. All 4 use the 65 clean speech recordings, the same 13 held-out speakers as the saved Nov 6 run, 400 training clips, and speech at RMS 0.025 so the undone audio fits in 16-bit:
-
-- `event-model-speech-ours.json`: our features, trained on clean clips. This is the main comparison.
-- `event-model-speech-mixed.json`: the same, but trained on clean, filtered and undone clips, a third of each. This is the extra comparison.
-- `event-model-speech-both.json`: our features plus PANNs.
-- `event-model-speech-levels.json`: our features, trained at different loudness levels. It's for the app, since the app gets recordings at any level.
-
-Train each one on the saved split, then run its comparison. Here's the first one:
+## 5. Ask it about a recording
 
 ```
-python -m pipeline.event_model train --settings run-settings/event-model-speech-ours.json --split results/2026-11-06-le-event-model-speech-ours/split.json --out results/<YYYY-MM-DD>-<your-name>-event-model-speech-ours
-python -m pipeline.event_model compare --model results/<YYYY-MM-DD>-<your-name>-event-model-speech-ours/model.joblib --filter-id-model results/2026-11-06-le-filter-id-speech-48k/model.joblib --out results/<YYYY-MM-DD>-<your-name>-event-model-speech-ours/compare
+python -m pipeline.filter_id predict --model results/my-run/model.joblib clip.wav
 ```
 
-The speech recordings (`data/adam-good/clean/`) and the filter ID model (`results/2026-11-06-le-filter-id-speech-48k/model.joblib`) aren't in Git, so ask Le for them. The quick runs behind these settings are in the Nov 10 entry of `docs/experiment-log.md`.
-
-### The pretrained model (PANNs)
-
-PANNs CNN14 was trained on AudioSet (~2 million clips, 527 sound classes). We use it frozen: it gives a probability for each of its 527 classes every 10 ms, and the event model reads those next to (or instead of) our own features. It hears 50 Hz-14 kHz, so our features still cover below 50 Hz, 14-24 kHz, and the sharp timing of thumps and clicks.
-
-Before turning it on (`"use_panns": true`), get its checkpoint (~330 MB, into `data/models/`, which Git ignores) and AudioSet's label list once:
+The WAV has to be mono & 48 kHz. You can list more than one. Each file prints as one line:
 
 ```
-python -m pipeline.event_model.pretrained download
+{"file": "clip.wav", "spec": {"type": "bandpass", "family": "butter", "order": 2, "cutoff": [125.4, 3508.5]}, "confidence": {"order": 0.50, "type": 0.95}}
 ```
 
-It runs on an NVIDIA card if PyTorch can use one, and on the CPU if it can't. A WAV has to be at least 0.31 s long for it, and anything longer than ~1 minute goes through a piece at a time, so a long recording doesn't run out of memory. It also checks that the checkpoint is the file from the download command, since other CNN14 checkpoints load with no error and give different numbers.
+How to read it:
 
-The normal test run checks the PANNs code with a stand-in. To check the real model, run this on its own (it needs ~1 GB of memory):
+- `type`: `lowpass`, `highpass`, or `bandpass`.
+- `order`: how steep the filter is. It's 1, 2, or 4. A band-pass counts both of its sides together, so it's 2, 4, or 8.
+- `cutoff`: where the filter starts cutting, in Hz. A band-pass has two: `[low, high]`.
+- `confidence`: how sure the model is about the type & the order, from 0 to 1.
 
-```
-python -m pytest pipeline/tests/check_panns.py
-```
+Two things to know:
 
-PANNs is by Qiuqiang Kong et al., "PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition" (2020). Its code is MIT-licensed, and the checkpoint is shared on Zenodo under CC BY 4.0.
+- The model always names a filter. It has no "this wasn't filtered" answer, so only give it filtered audio.
+- The C inverse filter counts each side of a band-pass by itself, so it gets half of the band-pass order.
 
-## Status
+## Credits
 
-The filter ID model is in `pipeline/filter_id/` and the event model is in `pipeline/event_model/`, with their tests in `pipeline/tests/`. The functions they share (filters, test sounds, noise and rounding, records, and the Python copy of the C inverse in `compensation.py`) are in `pipeline/`. The compensation filter's C code is in `pipeline/reversable_filters/`. The functions the walkthrough notebook calls are in `pipeline/walkthrough.py`.
+The speech recordings are from the CSTR VCTK Corpus: English Multi-speaker Corpus for CSTR Voice Cloning Toolkit (version 0.80), by Christophe Veaux, Junichi Yamagishi & Kirsten MacDonald, The Centre for Speech Technology Research, University of Edinburgh. It's shared under the Open Data Commons Attribution License (ODC-By) v1.0.

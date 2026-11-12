@@ -13,7 +13,7 @@ import soundfile as sf
 from scipy import signal
 
 from pipeline.filter_id import FilterIdModel, evaluate, load_model, save_model, spectrum_features, split_by_recording
-from pipeline.filter_id.__main__ import main
+from pipeline.filter_id.__main__ import DEFAULT_SETTINGS, main
 
 FS = 48_000
 CLIP_SECONDS = 0.5
@@ -199,3 +199,63 @@ def test_predict_stops_on_stereo_or_wrong_rate(all_types, tmp_path):
     for name in ("stereo.wav", "wrong-rate.wav"):
         with pytest.raises(SystemExit):
             main(["predict", "--model", str(path), str(tmp_path / name)])
+
+
+# Writes 10 mono WAVs of tilted noise, 2 seconds each, and returns the repo's own
+# train settings pointed at them, with shorter clips and fewer examples so
+# training takes seconds.
+def train_settings(folder):
+    source_dir = folder / "wavs"
+    source_dir.mkdir()
+    rng = np.random.default_rng(2)
+    for source in range(10):
+        clip = source_clip(rng, rng.uniform(-6, 3))
+        audio = 0.1 * np.tile(clip, 4) / np.max(np.abs(clip))
+        sf.write(source_dir / f"rec-{source:02d}.wav", audio.astype(np.float32), FS, subtype="FLOAT")
+    settings = json.loads(DEFAULT_SETTINGS.read_text(encoding="utf-8"))
+    settings["source_dir"] = str(source_dir)
+    settings["clip_seconds"] = CLIP_SECONDS
+    settings["examples_per_source"] = 8
+    return settings
+
+
+# Saves the settings as a JSON file and runs the train command into a new folder.
+# It returns the scores train wrote there.
+def run_train(settings, folder, name):
+    settings_path = folder / f"{name}-settings.json"
+    settings_path.write_text(json.dumps(settings), encoding="utf-8")
+    main(["train", "--settings", str(settings_path), "--out", str(folder / name)])
+    return json.loads((folder / name / "metrics.json").read_text(encoding="utf-8"))
+
+
+# Tests: train writes a model that loads, the settings, and the scores, with whole recordings held out. A second
+#   run from the same settings and WAV files gives the same scores and holds out the same recordings.
+# Why: this is the command teammates run on their own machines to rebuild the model. If two runs didn't match,
+#   nobody could check their copy against the numbers in the report.
+def test_train_writes_a_run_that_repeats(tmp_path):
+    settings = train_settings(tmp_path)
+    first = run_train(settings, tmp_path, "run-a")
+    second = run_train(settings, tmp_path, "run-b")
+    assert first["train_recordings"] + first["test_recordings"] == 10
+    assert first["examples"] == 8 * len(first["test_recording_ids"])
+    _, loaded_settings = load_model(tmp_path / "run-a" / "model.joblib")
+    assert loaded_settings == settings
+    first.pop("seconds")
+    second.pop("seconds")
+    assert first == second
+
+
+# Tests: train stops with a message when --out already exists, and when the source folder has no WAV files. In
+#   the second case it doesn't leave an empty run folder behind.
+# Why: a rerun shouldn't overwrite a run someone already reported, and a teammate who hasn't copied the
+#   recordings in yet should get told that in one line.
+def test_train_stops_on_an_existing_folder_or_no_wavs(tmp_path):
+    settings = train_settings(tmp_path)
+    (tmp_path / "taken").mkdir()
+    with pytest.raises(SystemExit):
+        run_train(settings, tmp_path, "taken")
+    (tmp_path / "empty").mkdir()
+    settings["source_dir"] = str(tmp_path / "empty")
+    with pytest.raises(SystemExit):
+        run_train(settings, tmp_path, "no-wavs")
+    assert not (tmp_path / "no-wavs").exists()

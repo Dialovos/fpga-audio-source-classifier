@@ -1,1 +1,1 @@
-"""Python pipeline: test data, filter identification, inverse filtering, and event detection."""
+"""Python pipeline: test data, filter identification, and inverse filtering."""
